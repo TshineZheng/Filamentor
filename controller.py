@@ -53,3 +53,12 @@ class Controller(ABC):
         """保存配置
         """
         pass
+
+    @abstractmethod
+    def is_active_push(self, channel_index: int) -> bool:
+        """是否主动送料
+
+        Returns:
+            bool: 是否主动送料
+        """
+        pass

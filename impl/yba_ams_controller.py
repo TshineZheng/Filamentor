@@ -126,3 +126,6 @@ class YBAAMSController(Controller):
             self.ams_control(channel_index, 0)
 
         return True
+    
+    def is_active_push(self, channel_index: int) -> bool:
+        return True

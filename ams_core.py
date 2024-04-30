@@ -61,6 +61,12 @@ class AmsCore(object):
         c,i = self.channels[channel]
         c.control(i, action)
 
+    def on_resumed(self):
+        c,i = self.channels[self.filament_current]
+        # 非主动送料的通道，直接松开
+        if not c.is_active_push(i):
+            c.control(i, ChannelAction.Off)
+
     def run_filament_change(self, next_filament: int):
         if self.filament_changing:
             return
@@ -146,6 +152,8 @@ class AmsCore(object):
             print("换色完成")
             self.printer_client.resume()
             print("恢复打印")
+
+            self.on_resumed()
 
         self.filament_changing = False
 

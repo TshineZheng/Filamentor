@@ -12,9 +12,6 @@ class ChannelAction(Enum):
 
 class Controller(ABC):
     """料架控制器
-
-    Args:
-
     """
 
     @staticmethod
@@ -29,14 +26,19 @@ class Controller(ABC):
             channel_count (int): 通道数量
         """
         self.channel_count = channel_count
+        self.is_running = False
 
     @abstractmethod
     def start(self):
-        pass
+        """启动控制器
+        """
+        self.is_running = True
 
     @abstractmethod
     def stop(self):
-        pass
+        """停止控制器
+        """
+        self.is_running = False
 
     @abstractmethod
     def control(self, channel_index: int, action: ChannelAction) -> bool:

@@ -2,11 +2,11 @@ import json
 from typing import List
 
 from broken_detect import BrokenDetect
-from impl.bambu_client import BambuClient, BambuClientConfig
-from mqtt_config import MQTTConfig
 from controller import Controller
+from impl.bambu_client import BambuClient, BambuClientConfig
 from impl.mqtt_broken_detect import MQTTBrokenDetect
 from impl.yba_ams_controller import YBAAMSController
+from mqtt_config import MQTTConfig
 from printer_client import PrinterClient
 
 
@@ -40,6 +40,12 @@ class ChannelRelation:
 
 
 class DetectRelation:
+    """打印机和断料检测器的绑定关系
+
+    Aegs:
+        printer_id (str): 打印机ID
+        detect_id (str): 检测器ID
+    """
     def __init__(self, printer_id: str, detect_id: str) -> None:
         self.printer_id = printer_id
         self.detect_id = detect_id
@@ -285,7 +291,7 @@ class AppConfig:
                 return True
         return False
     
-    def get_printer_channel_settings(self, printer_id: str) -> list[ChannelRelation]:
+    def get_printer_channel_settings(self, printer_id: str) -> List[ChannelRelation]:
         return [p for p in self.channel_settings if p.printer_id == printer_id]
 
     def get_printer(self, printer_id: str) -> PrinterClient:
@@ -294,7 +300,7 @@ class AppConfig:
                 return p.client
         return None
     
-    def get_printer_broken_detect(self, printer_id: str) -> list[BrokenDetect]:
+    def get_printer_broken_detect(self, printer_id: str) -> List[BrokenDetect]:
         t =  [p for p in self.detect_list if p.id == printer_id]
         # 把 IDBrokenDetect 转换为 BrokenDetect
         return [p.detect for p in t]

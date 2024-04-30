@@ -1,15 +1,13 @@
 import threading
 import time
-from typing import List
-from app_config import AppConfig
-from impl.bambu_broken_detect import BambuBrokenDetect
-from impl.bambu_client import BambuClient, BambuClientConfig
-from log import LOGI
-import printer_client as printer
-from mqtt_config import MQTTConfig
-from broken_detect import BrokenDetect
-from controller import ChannelAction, Controller
 from datetime import datetime
+from typing import List
+
+import printer_client as printer
+from app_config import AppConfig
+from controller import ChannelAction, Controller
+from log import LOGI
+
 
 class AmsCore(object):
     def __init__(
@@ -19,11 +17,11 @@ class AmsCore(object):
         cur_channel: int,
         change_tem: int,
     ) -> None:
-        self.filament_current = cur_channel
-        self.filament_next = 0
+        self.fila_cur = cur_channel
+        self.fila_next = 0
         self.change_count = 0
         self.change_tem = change_tem
-        self.filament_changing = False
+        self.fila_changing = False
         self.app_config = app_config
         self.printer_client = app_config.get_printer(use_printer)
         self.broken_detects = app_config.get_printer_broken_detect(use_printer)
@@ -31,39 +29,16 @@ class AmsCore(object):
         if self.broken_detects is None or len(self.broken_detects) == 0:
             self.broken_detects = [self.printer_client.filament_broken_detect()]   # 如果没有自定义断线检测，使用打印默认的
 
-        controllers_id:list[str] = []
-        self.channels: List[tuple[Controller, int]] = []
+        self.channels: List[tuple[Controller, int]] = []    # 控制器对象, 通道在控制器上的序号
         for c in app_config.get_printer_channel_settings(use_printer):
-            if c.controller_id not in controllers_id:
-                controllers_id.append(c.controller_id)
             self.channels.append([app_config.get_controller(c.controller_id), c.channel])
 
-        self.controllers = [app_config.get_controller(c) for c in controllers_id]
-
-    def run(self):
-        self.printer_client.start()    # 启动打印机连接
-
-        for c in self.controllers: # 启动所有控制器
-            c.start()
-
-        for bd in self.broken_detects:  # 启动所有断线检测
-            bd.start()
-
-    def stop(self):
-        self.printer_client.stop() # 关闭打印机连接
-
-        for c in self.controllers: # 启动所有控制器
-            c.stop()
-
-        for bd in self.broken_detects:  # 关闭所有断线检测
-            bd.stop()
-
-    def driver_control(self, channel: int, action: ChannelAction):
-        c,i = self.channels[channel]
+    def driver_control(self, printer_ch: int, action: ChannelAction):
+        c,i = self.channels[printer_ch]
         c.control(i, action)
 
     def on_resumed(self):
-        c,i = self.channels[self.filament_current]
+        c,i = self.channels[self.fila_cur]
         # 非主动送料的通道，直接松开
         if not c.is_active_push(i):
             c.control(i, ChannelAction.STOP)
@@ -83,9 +58,9 @@ class AmsCore(object):
         return max([bd.safe_time() for bd in self.broken_detects])
 
     def run_filament_change(self, next_filament: int):
-        if self.filament_changing:
+        if self.fila_changing:
             return
-        self.filament_changing = True
+        self.fila_changing = True
         self.thread = threading.Thread(
             target=self.filament_change, args=(next_filament,))
         self.thread.start()
@@ -95,17 +70,17 @@ class AmsCore(object):
 
         self.change_count += 1
         LOGI(f'第 {self.change_count} 次换色')
-        self.filament_next = next_filament
-        LOGI(f'当前通道 {self.filament_current + 1}，下个通道 {self.filament_next + 1}')
+        self.fila_next = next_filament
+        LOGI(f'当前通道 {self.fila_cur + 1}，下个通道 {self.fila_next + 1}')
 
-        if self.filament_current == self.filament_next:
+        if self.fila_cur == self.fila_next:
             self.printer_client.resume()
             LOGI("通道相同，无需换色, 恢复打印")
-            self.filament_changing = False
+            self.fila_changing = False
             return
 
         LOGI("等待退料完成")
-        self.driver_control(self.filament_current, ChannelAction.PULL)   # 回抽当前通道
+        self.driver_control(self.fila_cur, ChannelAction.PULL)   # 回抽当前通道
         self.printer_client.on_unload(self.change_tem)
 
         now = datetime.now().timestamp
@@ -116,9 +91,9 @@ class AmsCore(object):
             time.sleep(2)
             if datetime.now().timestamp() - now > 10_000:
                 LOGI("退料超时，抖一抖")
-                self.driver_control(self.filament_current, ChannelAction.PUSH)
+                self.driver_control(self.fila_cur, ChannelAction.PUSH)
                 time.sleep(1)
-                self.driver_control(self.filament_current, ChannelAction.PULL)
+                self.driver_control(self.fila_cur, ChannelAction.PULL)
                 now = datetime.now().timestamp
             if max_pull_time < datetime.now().timestamp():
                 LOGI("退不出来，摇人吧（需要手动把料撤回）")
@@ -130,14 +105,14 @@ class AmsCore(object):
             time.sleep(safe_time)   # 再退一点
             LOGI("退料到安全距离")
 
-        self.driver_control(self.filament_current, ChannelAction.STOP)   # 停止抽回
+        self.driver_control(self.fila_cur, ChannelAction.STOP)   # 停止抽回
 
         # 强行让打印机材料状态变成无，避免万一竹子消息延迟或什么的，不要完全相信别人的接口，如果可以自己判断的话（使用自定义断料检测器有效）
         self.printer_client.set_filament_state(printer.FilamentState.NO)
 
         time.sleep(1)  # 休息下呗，万一板子反映不过来呢
 
-        self.driver_control(self.filament_next, ChannelAction.PUSH)   # 输送下一个通道
+        self.driver_control(self.fila_next, ChannelAction.PUSH)   # 输送下一个通道
         LOGI("开始输送下一个通道")
 
         # 到料目前还只能通过打印机判断，只能等了，不断刷新
@@ -146,14 +121,14 @@ class AmsCore(object):
             # TODO: 这里需要增加超时机制，如果一直送不到，需要呼叫用户确认处理
             time.sleep(2)
 
-        self.filament_current = self.filament_next
+        self.fila_cur = self.fila_next
         LOGI("料线到达，换色完成")
         self.printer_client.resume()
         LOGI("恢复打印")
 
         self.on_resumed()
 
-        self.filament_changing = False
+        self.fila_changing = False
 
     def on_printer_action(self, action: printer.Action, data):
         if action == printer.Action.CHANGE_FILAMENT:
@@ -164,3 +139,9 @@ class AmsCore(object):
 
         if action == printer.Action.FILAMENT_SWITCH_1:
             pass
+
+    def run(self):
+        pass
+
+    def stop(self):
+        pass

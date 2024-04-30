@@ -8,7 +8,7 @@ import printer_client as printer
 from mqtt_config import MQTTConfig
 from broken_detect import BrokenDetect
 from controller import ChannelAction, Controller
-
+from datetime import datetime
 
 class AmsCore(object):
     def __init__(
@@ -100,9 +100,17 @@ class AmsCore(object):
             self.driver_control(self.filament_current, ChannelAction.PULL)   # 回抽当前通道
             self.printer_client.on_unload(self.change_tem)
 
+            now = datetime.now().timestamp
+
             # 等待所有断料检测器都没有料
             while self.is_filament_broken():
                 time.sleep(2)
+                if datetime.now().timestamp() - now > 10_000:
+                    print("退料超时，抖一抖")
+                    self.driver_control(self.filament_current, ChannelAction.PUSH)
+                    time.sleep(1)
+                    self.driver_control(self.filament_current, ChannelAction.PULL)
+                    now = datetime.now().timestamp
 
             print("退料检测到位")
 

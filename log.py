@@ -1,5 +1,6 @@
 from loguru import logger as LOG
 
+
 def LOGI(msg):
     LOG.info(msg)
 
@@ -8,6 +9,9 @@ def LOGW(msg):
 
 def LOGE(msg):
     LOG.error(msg)
+
+def LOGD(msg):
+    LOG.debug(msg)
 
 LOG.add(
     sink = './logs/filamentor.log',

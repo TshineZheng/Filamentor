@@ -4,6 +4,7 @@ from typing import List
 from app_config import AppConfig
 from impl.bambu_broken_detect import BambuBrokenDetect
 from impl.bambu_client import BambuClient, BambuClientConfig
+from log import LOGI
 import printer_client as printer
 from mqtt_config import MQTTConfig
 from broken_detect import BrokenDetect
@@ -93,17 +94,17 @@ class AmsCore(object):
         # FIXME: 要增加通道不匹配的判断，比如接到换第4通道，结果我们只有3通道，可以呼叫用户确认，再继续
 
         self.change_count += 1
-        print(f'开始第 {self.change_count} 次换色')
+        LOGI(f'第 {self.change_count} 次换色')
         self.filament_next = next_filament
-        print(f'当前通道 {self.filament_current + 1}，下个通道 {self.filament_next + 1}')
+        LOGI(f'当前通道 {self.filament_current + 1}，下个通道 {self.filament_next + 1}')
 
         if self.filament_current == self.filament_next:
             self.printer_client.resume()
-            print("无需换色, 恢复打印")
+            LOGI("通道相同，无需换色, 恢复打印")
             self.filament_changing = False
             return
 
-        print("等待退料完成")
+        LOGI("等待退料完成")
         self.driver_control(self.filament_current, ChannelAction.PULL)   # 回抽当前通道
         self.printer_client.on_unload(self.change_tem)
 
@@ -114,23 +115,20 @@ class AmsCore(object):
         while self.is_filament_broken():
             time.sleep(2)
             if datetime.now().timestamp() - now > 10_000:
-                print("退料超时，抖一抖")
+                LOGI("退料超时，抖一抖")
                 self.driver_control(self.filament_current, ChannelAction.PUSH)
                 time.sleep(1)
                 self.driver_control(self.filament_current, ChannelAction.PULL)
                 now = datetime.now().timestamp
             if max_pull_time < datetime.now().timestamp():
-                print("退不出来喊人")
+                LOGI("退不出来，摇人吧（需要手动把料撤回）")
                 # TODO: 发出警报
-                while True:
-                    time.sleep(1)
 
-        print("退料检测到位")
-
+        LOGI("退料检测到位")
         safe_time = self.get_max_broken_safe_time()
         if safe_time > 0:
             time.sleep(safe_time)   # 再退一点
-            print("退料到安全距离")
+            LOGI("退料到安全距离")
 
         self.driver_control(self.filament_current, ChannelAction.STOP)   # 停止抽回
 
@@ -140,7 +138,7 @@ class AmsCore(object):
         time.sleep(1)  # 休息下呗，万一板子反映不过来呢
 
         self.driver_control(self.filament_next, ChannelAction.PUSH)   # 输送下一个通道
-        print("开始输送下一个通道")
+        LOGI("开始输送下一个通道")
 
         # 到料目前还只能通过打印机判断，只能等了，不断刷新
         while self.printer_client.get_filament_state() != printer.FilamentState.YES:    # 等待打印机料线到达
@@ -148,11 +146,10 @@ class AmsCore(object):
             # TODO: 这里需要增加超时机制，如果一直送不到，需要呼叫用户确认处理
             time.sleep(2)
 
-        print("料线到达")
         self.filament_current = self.filament_next
-        print("换色完成")
+        LOGI("料线到达，换色完成")
         self.printer_client.resume()
-        print("恢复打印")
+        LOGI("恢复打印")
 
         self.on_resumed()
 

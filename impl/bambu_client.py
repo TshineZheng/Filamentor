@@ -1,11 +1,13 @@
 import json
+import ssl
 import time
 from typing import Any, Callable
+
 import paho.mqtt.client as mqtt
-import ssl
 
 from broken_detect import BrokenDetect
 from impl.bambu_broken_detect import BambuBrokenDetect
+from log import LOGD, LOGI
 from printer_client import Action, FilamentState, PrinterClient
 
 # 定义服务器信息和认证信息
@@ -92,34 +94,34 @@ class BambuClient(PrinterClient):
     # noinspection PyUnusedLocal
     def on_connect(self, client, userdata, flags, rc, properties):
         if rc == 0:
-            print("连接竹子成功")
+            LOGI("连接竹子成功")
             # 连接成功后订阅主题
             client.subscribe(self.TOPIC_SUBSCRIBE, qos=1)
         else:
-            print(f"连接竹子失败，错误代码 {rc}")
+            LOGI(f"连接竹子失败，错误代码 {rc}")
 
     # noinspection PyUnusedLocal
     def on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
-        print("连接已断开，请检查打印机状态，以及是否有其它应用占用了打印机")
+        LOGI("连接已断开，请检查打印机状态，以及是否有其它应用占用了打印机")
         self.reconnect(client)
 
     def reconnect(self, client, delay=3):
         while True:
-            print("尝试重新连接竹子...")
+            LOGI("尝试重新连接竹子...")
             try:
                 client.reconnect()
                 break  # 重连成功则退出循环
             except:
-                print(f"重连竹子失败 {delay} 秒后重试...")
+                LOGI(f"重连竹子失败 {delay} 秒后重试...")
                 time.sleep(delay)  # 等待一段时间后再次尝试
 
     def on_message(self, client, userdata, message):
         try:
             payload = str(message.payload.decode('utf-8'))
             json_data = json.loads(payload)
-            print(payload)
+            LOGD(payload)
         except json.JSONDecodeError:
-            print("JSON解析失败")
+            LOGI("JSON解析失败")
             return
 
         if "print" in json_data:

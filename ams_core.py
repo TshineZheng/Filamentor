@@ -65,15 +65,7 @@ class AmsCore(object):
         c,i = self.channels[self.filament_current]
         # 非主动送料的通道，直接松开
         if not c.is_active_push(i):
-            c.control(i, ChannelAction.Off)
-
-    def run_filament_change(self, next_filament: int):
-        if self.filament_changing:
-            return
-        self.filament_changing = True
-        self.thread = threading.Thread(
-            target=self.filament_change, args=(next_filament,))
-        self.thread.start()
+            c.control(i, ChannelAction.STOP)
 
     def is_filament_broken(self) -> bool:
         """当所有断料检测器都没有料时，返回 True
@@ -89,6 +81,14 @@ class AmsCore(object):
     def get_max_broken_safe_time(self) -> int:
         return max([bd.safe_time() for bd in self.broken_detects])
 
+    def run_filament_change(self, next_filament: int):
+        if self.filament_changing:
+            return
+        self.filament_changing = True
+        self.thread = threading.Thread(
+            target=self.filament_change, args=(next_filament,))
+        self.thread.start()
+
     def filament_change(self, next_filament: int):
         # FIXME: 要增加通道不匹配的判断，比如接到换第4通道，结果我们只有3通道，可以呼叫用户确认，再继续
 
@@ -98,62 +98,63 @@ class AmsCore(object):
         print(f'当前通道 {self.filament_current + 1}，下个通道 {self.filament_next + 1}')
 
         if self.filament_current == self.filament_next:
-            print('无需换色')
             self.printer_client.resume()
-            print("恢复打印")
-        else:
-            print("等待退料完成")
-            self.driver_control(self.filament_current, ChannelAction.PULL)   # 回抽当前通道
-            self.printer_client.on_unload(self.change_tem)
+            print("无需换色, 恢复打印")
+            self.filament_changing = False
+            return
 
-            now = datetime.now().timestamp
-            max_pull_time = now + 60 * 10_000
+        print("等待退料完成")
+        self.driver_control(self.filament_current, ChannelAction.PULL)   # 回抽当前通道
+        self.printer_client.on_unload(self.change_tem)
 
-            # 等待所有断料检测器都没有料
-            while self.is_filament_broken():
-                time.sleep(2)
-                if datetime.now().timestamp() - now > 10_000:
-                    print("退料超时，抖一抖")
-                    self.driver_control(self.filament_current, ChannelAction.PUSH)
+        now = datetime.now().timestamp
+        max_pull_time = now + 60 * 10_000
+
+        # 等待所有断料检测器都没有料
+        while self.is_filament_broken():
+            time.sleep(2)
+            if datetime.now().timestamp() - now > 10_000:
+                print("退料超时，抖一抖")
+                self.driver_control(self.filament_current, ChannelAction.PUSH)
+                time.sleep(1)
+                self.driver_control(self.filament_current, ChannelAction.PULL)
+                now = datetime.now().timestamp
+            if max_pull_time < datetime.now().timestamp():
+                print("退不出来喊人")
+                # TODO: 发出警报
+                while True:
                     time.sleep(1)
-                    self.driver_control(self.filament_current, ChannelAction.PULL)
-                    now = datetime.now().timestamp
-                if max_pull_time < datetime.now().timestamp():
-                    print("退不出来喊人")
-                    # TODO: 发出警报
-                    while True:
-                        time.sleep(1)
 
-            print("退料检测到位")
+        print("退料检测到位")
 
-            safe_time = self.get_max_broken_safe_time()
-            if safe_time > 0:
-                time.sleep(safe_time)   # 再退一点
-                print("退料到安全距离")
+        safe_time = self.get_max_broken_safe_time()
+        if safe_time > 0:
+            time.sleep(safe_time)   # 再退一点
+            print("退料到安全距离")
 
-            self.driver_control(self.filament_current, ChannelAction.STOP)   # 停止抽回
+        self.driver_control(self.filament_current, ChannelAction.STOP)   # 停止抽回
 
-            # 强行让打印机材料状态变成无，避免万一竹子消息延迟或什么的，不要完全相信别人的接口，如果可以自己判断的话（使用自定义断料检测器有效）
-            self.printer_client.set_filament_state(printer.FilamentState.NO)
+        # 强行让打印机材料状态变成无，避免万一竹子消息延迟或什么的，不要完全相信别人的接口，如果可以自己判断的话（使用自定义断料检测器有效）
+        self.printer_client.set_filament_state(printer.FilamentState.NO)
 
-            time.sleep(1)  # 休息下呗，万一板子反映不过来呢
+        time.sleep(1)  # 休息下呗，万一板子反映不过来呢
 
-            self.driver_control(self.filament_next, ChannelAction.PUSH)   # 输送下一个通道
-            print("开始输送下一个通道")
+        self.driver_control(self.filament_next, ChannelAction.PUSH)   # 输送下一个通道
+        print("开始输送下一个通道")
 
-            # 到料目前还只能通过打印机判断，只能等了，不断刷新
-            while self.printer_client.get_filament_state() != printer.FilamentState.YES:    # 等待打印机料线到达
-                self.printer_client.refresh_status()    # 刷新打印机状态
-                # TODO: 这里需要增加超时机制，如果一直送不到，需要呼叫用户确认处理
-                time.sleep(2)
+        # 到料目前还只能通过打印机判断，只能等了，不断刷新
+        while self.printer_client.get_filament_state() != printer.FilamentState.YES:    # 等待打印机料线到达
+            self.printer_client.refresh_status()    # 刷新打印机状态
+            # TODO: 这里需要增加超时机制，如果一直送不到，需要呼叫用户确认处理
+            time.sleep(2)
 
-            print("料线到达")
-            self.filament_current = self.filament_next
-            print("换色完成")
-            self.printer_client.resume()
-            print("恢复打印")
+        print("料线到达")
+        self.filament_current = self.filament_next
+        print("换色完成")
+        self.printer_client.resume()
+        print("恢复打印")
 
-            self.on_resumed()
+        self.on_resumed()
 
         self.filament_changing = False
 

@@ -1,28 +1,52 @@
 import threading
-from filament_driver import FilamentDriver
-import socket
 import time
+from typing import List
+from controller import ChannelAction, Controller
+import socket
 
 CH_MAP = [1, 2, 3, 4]  # 通道映射表
 ams_head = b'\x2f\x2f\xff\xfe\x01\x02'
 
-class YBAAMS:
+class YBAAMSController(Controller):
+    @staticmethod
+    def type_name() -> str:
+        return "yba_ams"
 
-    def __init__(self, ip: str, port: int):
-        self.ip = ip
-        self.port = port
-        self.sock: socket.socket = None
-        self.ch_state = [0, 0, 0, 0]
+    def __init__(self, ip: str, port: int, channel_count: int):
+        super().__init__(channel_count)
+        self.ip:str = ip
+        self.port:str = port
+        self.sock:socket.socket = None
+        self.ch_state:List[int] = [0, 0, 0, 0]
         self.running = False
         self.thread: threading.Thread = None
         self.lock = threading.Lock()
 
+    @classmethod
+    def from_dict(cls, json_data: dict):
+        return cls(
+            json_data["ip"],
+            json_data["port"],
+            json_data["channel_count"]
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            'ip': self.ip,
+            'port': self.port,
+            'channel_count': self.channel_count
+        }
+    
     def start(self):
+        super().start()
+        self.connect()
         self.running = True
         self.thread = threading.Thread(target=self.heartbeat)
         self.thread.start()
-
+    
     def stop(self):
+        super().stop()
+        self.disconnect()
         self.running = False
         if self.thread:
             self.thread.join()
@@ -90,18 +114,15 @@ class YBAAMS:
                         time.sleep(0.3)
                     time.sleep(1)
 
+    def control(self, channel_index: int, action: ChannelAction) -> bool:
+        if channel_index < 0 or channel_index >= self.channel_count:
+            return False
+        
+        if action == ChannelAction.PUSH:
+            self.ams_control(channel_index, 1)
+        elif action == ChannelAction.PULL:
+            self.ams_control(channel_index, 2)
+        elif action == ChannelAction.STOP:
+            self.ams_control(channel_index, 0)
 
-class YBADriver(FilamentDriver):
-
-    def __init__(self, yba:YBAAMS, channel:int):
-        self.yba = yba
-        self.channel = channel
-
-    def push(self):
-        self.yba.ams_control(self.channel, 1)
-
-    def pull(self):
-        self.yba.ams_control(self.channel, 2)
-
-    def stop(self):
-        self.yba.ams_control(self.channel, 0)
+        return True

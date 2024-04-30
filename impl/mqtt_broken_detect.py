@@ -1,11 +1,11 @@
 import time
-from filament_broken_detect import FilamentBrokenDetect
-from config.mqtt_config import MQTTConfig
+from broken_detect import BrokenDetect
+from mqtt_config import MQTTConfig
 import paho.mqtt.client as mqtt
 
 TOPIC = '/openams/filament_broken_detect'
 
-class MQTTFilamentBrokenDetect(FilamentBrokenDetect):
+class MQTTBrokenDetect(BrokenDetect):
     """断料检测服务
 
     通过监听 {TOPIC} 主题，检测打印机是否断料
@@ -13,6 +13,10 @@ class MQTTFilamentBrokenDetect(FilamentBrokenDetect):
     当监听数据为 "1" 时表示有料，当监听数据为 "0" 时表示无料
 
     """
+    @staticmethod
+    def type_name() -> str:
+        return 'mqtt_broken_detect'
+
     def __init__(self, mqtt_config: MQTTConfig):
         self.mqtt_config = mqtt_config
         self.topic = TOPIC
@@ -22,6 +26,15 @@ class MQTTFilamentBrokenDetect(FilamentBrokenDetect):
         self.client.on_disconnect = self.on_disconnect
         self.client.on_message = self.on_message
         self.latest_state = None
+
+    @classmethod
+    def from_dict(cls, json_data: dict):
+        return cls(MQTTConfig.from_dict(json_data['mqtt_config']))
+    
+    def to_dict(self) -> dict:
+        return {
+            'mqtt_config': self.mqtt_config.to_dict()
+        }
 
     def start(self):
         # 连接到MQTT服务器
@@ -76,17 +89,3 @@ class MQTTFilamentBrokenDetect(FilamentBrokenDetect):
             return True
         else:
             return False
-    
-if __name__ == '__main__':
-    config = MQTTConfig("192.168.10.233", 1883, "filament_broken_detect_service_test", "", "")
-
-    filament_broken_detect_service = MQTTFilamentBrokenDetect(config)
-
-    filament_broken_detect_service.start()
-
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        filament_broken_detect_service.stop() 
-

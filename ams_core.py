@@ -101,6 +101,7 @@ class AmsCore(object):
             self.printer_client.on_unload(self.change_tem)
 
             now = datetime.now().timestamp
+            max_pull_time = now + 60 * 10_000
 
             # 等待所有断料检测器都没有料
             while self.is_filament_broken():
@@ -111,6 +112,11 @@ class AmsCore(object):
                     time.sleep(1)
                     self.driver_control(self.filament_current, ChannelAction.PULL)
                     now = datetime.now().timestamp
+                if max_pull_time < datetime.now().timestamp():
+                    print("退不出来喊人")
+                    # TODO: 发出警报
+                    while True:
+                        time.sleep(1)
 
             print("退料检测到位")
 

@@ -57,7 +57,7 @@ class Controller(ABC):
         pass
 
     @abstractmethod
-    def is_active_push(self, channel_index: int) -> bool:
+    def is_initiative_push(self, channel_index: int) -> bool:
         """是否主动送料
 
         Returns:

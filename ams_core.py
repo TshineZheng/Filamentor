@@ -56,7 +56,7 @@ class AmsCore(object):
     def on_resumed(self):
         c,i = self.channels[self.fila_cur]
         # 非主动送料的通道，直接松开
-        if not c.is_active_push(i):
+        if not c.is_initiative_push(i):
             c.control(i, ChannelAction.STOP)
 
     def is_filament_broken(self) -> bool:

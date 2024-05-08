@@ -132,5 +132,5 @@ class YBAAMSController(Controller):
 
         return True
     
-    def is_active_push(self, channel_index: int) -> bool:
+    def is_initiative_push(self, channel_index: int) -> bool:
         return True

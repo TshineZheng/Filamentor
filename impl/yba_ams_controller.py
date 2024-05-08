@@ -24,6 +24,9 @@ class YBAAMSController(Controller):
         self.thread: threading.Thread = None
         self.lock = threading.Lock()
 
+    def __str__(self):
+        return self.type_name()
+
     @classmethod
     def from_dict(cls, json_data: dict):
         return cls(

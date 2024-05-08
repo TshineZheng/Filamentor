@@ -6,7 +6,7 @@ from typing import List
 import printer_client as printer
 from app_config import AppConfig
 from controller import ChannelAction, Controller
-from log import LOGI
+from log import LOGD, LOGI
 
 
 class AmsCore(object):
@@ -30,10 +30,20 @@ class AmsCore(object):
 
         if self.broken_detects is None or len(self.broken_detects) == 0:
             self.broken_detects = [self.printer_client.filament_broken_detect()]   # 如果没有自定义断线检测，使用打印默认的
+            LOGI(f'打印机{use_printer} 没有配置断料检测器，使用打印机自己的断料检测器')
 
         self.channels: List[tuple[Controller, int]] = []    # 控制器对象, 通道在控制器上的序号
         for c in app_config.get_printer_channel_settings(use_printer):
             self.channels.append([app_config.get_controller(c.controller_id), c.channel])
+
+        LOGD(f'打印机: {use_printer}, 通道数量{len(self.channels)}, 断料检测器数量{len(self.broken_detects)}')
+        # 打印所有通道
+        for c,i in self.channels:
+            LOGD(f'通道: {c.type_name()} {i}')
+
+        # 打印所有断料检测器
+        for bd in self.broken_detects:
+            LOGD(f'断料检测器: {bd.type_name()}')
 
     def driver_control(self, printer_ch: int, action: ChannelAction):
         c,i = self.channels[printer_ch]
@@ -52,7 +62,7 @@ class AmsCore(object):
             bool: _description_
         """
         for bd in self.broken_detects:
-            if not bd.is_filament_broken():
+            if bd.is_filament_broken() is not True:
                 return False
         return True
     
@@ -85,18 +95,18 @@ class AmsCore(object):
         self.driver_control(self.fila_cur, ChannelAction.PULL)   # 回抽当前通道
         self.printer_client.on_unload(self.change_tem)
 
-        now = datetime.now().timestamp
-        max_pull_time = now + 60 * 10_000
+        ts = datetime.now().timestamp()
+        max_pull_time = ts + 120    # 最大退料时间，如果超出这个时间，则提醒用户
 
         # 等待所有断料检测器都没有料
-        while self.is_filament_broken():
+        while not self.is_filament_broken():
             time.sleep(2)
-            if datetime.now().timestamp() - now > 10_000:
+            if datetime.now().timestamp() - ts > 30:   # 超时还没退到断料检测器
                 LOGI("退料超时，抖一抖")
                 self.driver_control(self.fila_cur, ChannelAction.PUSH)
-                time.sleep(1)
+                time.sleep(0.5)
                 self.driver_control(self.fila_cur, ChannelAction.PULL)
-                now = datetime.now().timestamp
+                ts = datetime.now().timestamp()
             if max_pull_time < datetime.now().timestamp():
                 LOGI("退不出来，摇人吧（需要手动把料撤回）")
                 # TODO: 发出警报
@@ -133,6 +143,7 @@ class AmsCore(object):
         self.fila_changing = False
 
     def on_printer_action(self, action: printer.Action, data):
+        LOGD(f'收到打印机消息 {action} {data}')
         if action == printer.Action.CHANGE_FILAMENT:
             self.run_filament_change(data)
 

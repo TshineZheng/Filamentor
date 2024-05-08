@@ -126,11 +126,15 @@ class BambuClient(PrinterClient):
 
         if "print" in json_data:
             if "gcode_state" in json_data["print"]:
-                if json_data["print"]["gcode_state"] == "PAUSE":  # 暂停状态
-                    if "mc_percent" in json_data["print"] and "mc_remaining_time" in json_data["print"]:
-                        if json_data["print"]["mc_percent"] == 101:  # 换色指令
+                if "mc_percent" in json_data["print"] and "mc_remaining_time" in json_data["print"]:
+                    if json_data["print"]["mc_percent"] == 101:  # 换色指令
+                        if json_data["print"]["gcode_state"] == "PAUSE":  # 暂停状态
                             filament_next = json_data["print"]["mc_remaining_time"]  # 更换通道
                             self.on_action(Action.CHANGE_FILAMENT, filament_next)
+                        else:
+                            LOGD('收到换色指令，但打印机不是暂停状态，重新刷新状态')
+                            # 有一种情况是暂停了，但打印机不会发消息过来，所以要确保打印机是在暂停状态再执行
+                            self.publish_status()
 
             if "hw_switch_state" in json_data["print"]:
                 if json_data["print"]["hw_switch_state"] == 0:

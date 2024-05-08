@@ -73,9 +73,10 @@ class MQTTBrokenDetect(BrokenDetect):
 
     def on_message(self, client, userdata, message):
         payload = str(message.payload.decode('utf-8'))
-        LOGI(f"断料检测：{payload}")
         if payload == '1' or payload == '0':
-            self.latest_state = payload
+            if self.latest_state != payload:
+                self.latest_state = payload
+                LOGI(f"断料检测：{'有料' if payload == '1' else '无料'}")
         
     def get_latest_state(self):
         return self.latest_state

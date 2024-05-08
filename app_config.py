@@ -314,10 +314,10 @@ class AppConfig:
         return None
     
     def get_printer_broken_detect(self, printer_id: str) -> List[BrokenDetect]:
-        t =  [p for p in self.detect_list if p.id == printer_id]
-        # 把 IDBrokenDetect 转换为 BrokenDetect
-        return [p.detect for p in t]
-    
+        t = [p for p in self.detect_settings if p.printer_id == printer_id]
+        return [p.detect for p in self.detect_list if p.id in [d.detect_id for d in t]]
+
+
     def get_controller(self, controller_id: str) -> Controller:
         for p in self.controller_list:
             if p.id == controller_id:

@@ -116,6 +116,7 @@ class AmsCore(object):
                 LOGI('打印机已经没有料了，抖一下吧，可以缓解五通卡头')
                 self.fila_shake(self.fila_cur, ChannelAction.PULL)
                 fila_shaked = True
+                ts = datetime.now().timestamp() # 重置抖一抖超时时间，避免这里抖完，超时那里又再抖一次
 
             if datetime.now().timestamp() - ts > UNLOAD_TIMEOUT:
                 LOGI("退料超时，抖一抖")

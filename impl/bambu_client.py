@@ -74,7 +74,7 @@ class BambuClient(PrinterClient):
     def to_dict(self) -> dict:
         return {
             'printer_ip': self.config.printer_ip,
-            'lan_password': MQTT_PORT,
+            'lan_password': self.config.lan_password,
             'device_serial': self.config.device_serial
         }
 
@@ -119,7 +119,7 @@ class BambuClient(PrinterClient):
         try:
             payload = str(message.payload.decode('utf-8'))
             json_data = json.loads(payload)
-            LOGD(payload)
+            LOGD(f'bambu_mqtt_msg -> {payload}')
         except json.JSONDecodeError:
             LOGI("JSON解析失败")
             return

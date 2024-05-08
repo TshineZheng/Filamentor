@@ -11,7 +11,7 @@ logger.add(sys.stderr, level="INFO")
 
 CUR_CHANNEL = 0     # 当前通道
 
-CHANGE_TEM = 255    # 换色问题
+CHANGE_TEM = 255    # 换色温度
 
 app_config = AppConfig.load()
 

@@ -8,6 +8,10 @@ from app_config import AppConfig
 from controller import ChannelAction, Controller
 from log import LOGD, LOGI
 
+LOAD_TIMEOUT = 30   # 装料超时
+LOAD_WARNING = 120  # 装料失败警告时间
+UNLOAD_TIMEOUT = 30 # 退料超时
+UNLOAD_WARNING = 120 # 退料失败警告时间
 
 class AmsCore(object):
     def __init__(
@@ -77,6 +81,11 @@ class AmsCore(object):
             target=self.filament_change, args=(next_filament,))
         self.thread.start()
 
+    def fila_shake(self, channel:int, action: ChannelAction, time=0.5):
+        self.driver_control(channel, ChannelAction.PULL if action == ChannelAction.PUSH else ChannelAction.PUSH)
+        time.sleep(time)
+        self.driver_control(channel, ChannelAction.PUSH if action == ChannelAction.PUSH else ChannelAction.PULL)
+
     def filament_change(self, next_filament: int):
         # FIXME: 要增加通道不匹配的判断，比如接到换第4通道，结果我们只有3通道，可以呼叫用户确认，再继续
 
@@ -96,17 +105,24 @@ class AmsCore(object):
         self.printer_client.on_unload(self.change_tem)
 
         ts = datetime.now().timestamp()
-        max_pull_time = ts + 120    # 最大退料时间，如果超出这个时间，则提醒用户
+        max_pull_time = ts + UNLOAD_WARNING    # 最大退料时间，如果超出这个时间，则提醒用户
+        fila_shaked = False  # 是否抖过料：当打印机断料检测器没有料时，会主动抖一下，如果抖过了就不再抖了，除非退料超时
 
         # 等待所有断料检测器都没有料
         while not self.is_filament_broken():
             time.sleep(2)
-            if datetime.now().timestamp() - ts > 30:   # 超时还没退到断料检测器
+
+            if fila_shaked == False and self.printer_client.get_filament_state() == printer.FilamentState.NO:
+                LOGI('打印机已经没有料了，抖一下吧，可以缓解五通卡头')
+                self.fila_shake(self.fila_cur, ChannelAction.PULL)
+                fila_shaked = True
+
+            if datetime.now().timestamp() - ts > UNLOAD_TIMEOUT:
                 LOGI("退料超时，抖一抖")
-                self.driver_control(self.fila_cur, ChannelAction.PUSH)
-                time.sleep(0.5)
-                self.driver_control(self.fila_cur, ChannelAction.PULL)
+                self.fila_shake(self.fila_cur, ChannelAction.PULL)
+                fila_shaked = True
                 ts = datetime.now().timestamp()
+
             if max_pull_time < datetime.now().timestamp():
                 LOGI("退不出来，摇人吧（需要手动把料撤回）")
                 # TODO: 发出警报
@@ -127,10 +143,21 @@ class AmsCore(object):
         self.driver_control(self.fila_next, ChannelAction.PUSH)   # 输送下一个通道
         LOGI("开始输送下一个通道")
 
+        ts = datetime.now().timestamp()
+        max_push_time = ts + LOAD_WARNING    # 最大送料时间，如果超出这个时间，则提醒用户
+
         # 到料目前还只能通过打印机判断，只能等了，不断刷新
         while self.printer_client.get_filament_state() != printer.FilamentState.YES:    # 等待打印机料线到达
+            if datetime.now().timestamp() - ts > LOAD_TIMEOUT:
+                LOGI("送料超时，抖一抖")
+                self.fila_shake(self.fila_next, ChannelAction.PUSH)
+                ts = datetime.now().timestamp()
+
+            if max_push_time < datetime.now().timestamp():
+                LOGI("送不进去，摇人吧（需要手动把料送进去）")
+                # TODO: 发出警报
+
             self.printer_client.refresh_status()    # 刷新打印机状态
-            # TODO: 这里需要增加超时机制，如果一直送不到，需要呼叫用户确认处理
             time.sleep(2)
 
         self.fila_cur = self.fila_next

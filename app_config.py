@@ -171,14 +171,14 @@ class AppConfig:
         with open('filamentor_config.json', 'w') as f:
             json.dump(self.to_dict(), f)
     
-    def load(self) -> bool:
+    @classmethod
+    def load(cls):
         try:
             with open('filamentor_config.json', 'r') as f:
                 data = json.load(f)
-                self.from_dict(data)
-                return True
+                return AppConfig.from_dict(data)
         except:
-            return False
+            return None
     
     def add_printer(self, id: str, client: PrinterClient) -> bool:
         # 确保id不重复

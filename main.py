@@ -1,13 +1,13 @@
 import time
 
 from ams_core import AmsCore
-from app_config import (AppConfig, ChannelRelation, DetectRelation,
-                        IDBrokenDetect, IDController, IDPrinterClient)
+from app_config import AppConfig
 from controller import ChannelAction
-from impl.bambu_client import BambuClient, BambuClientConfig
-from impl.mqtt_broken_detect import MQTTBrokenDetect
-from impl.yba_ams_controller import YBAAMSController
-from mqtt_config import MQTTConfig
+from loguru import logger
+import sys
+
+logger.remove(0)
+logger.add(sys.stderr, level="INFO")
 
 CUR_CHANNEL = 0     # 当前通道
 

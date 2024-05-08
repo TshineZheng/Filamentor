@@ -6,13 +6,13 @@ def LOGI(msg, *args: Any, **kwargs: Any):
     LOG.info(msg, *args, **kwargs)
 
 def LOGW(msg, *args: Any, **kwargs: Any):
-    LOG.info(msg *args, **kwargs)
+    LOG.info(msg, *args, **kwargs)
 
 def LOGE(msg, *args: Any, **kwargs: Any):
-    LOG.error(msg *args, **kwargs)
+    LOG.error(msg, *args, **kwargs)
 
 def LOGD(msg, *args: Any, **kwargs: Any):
-    LOG.debug(msg *args, **kwargs)
+    LOG.debug(msg, *args, **kwargs)
 
 LOG.add(
     sink = './logs/filamentor.log',

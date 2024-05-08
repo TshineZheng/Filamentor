@@ -1,17 +1,18 @@
+from typing import Any
 from loguru import logger as LOG
 
 
-def LOGI(msg):
-    LOG.info(msg)
+def LOGI(msg, *args: Any, **kwargs: Any):
+    LOG.info(msg, *args, **kwargs)
 
-def LOGW(msg):
-    LOG.info(msg)
+def LOGW(msg, *args: Any, **kwargs: Any):
+    LOG.info(msg *args, **kwargs)
 
-def LOGE(msg):
-    LOG.error(msg)
+def LOGE(msg, *args: Any, **kwargs: Any):
+    LOG.error(msg *args, **kwargs)
 
-def LOGD(msg):
-    LOG.debug(msg)
+def LOGD(msg, *args: Any, **kwargs: Any):
+    LOG.debug(msg *args, **kwargs)
 
 LOG.add(
     sink = './logs/filamentor.log',

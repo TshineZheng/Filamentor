@@ -167,6 +167,19 @@ class AppConfig:
             "mqtt_config": self.mqtt_config.to_dict()
         }
     
+    def save(self):
+        with open('filamentor_config.json', 'w') as f:
+            json.dump(self.to_dict(), f)
+    
+    def load(self) -> bool:
+        try:
+            with open('filamentor_config.json', 'r') as f:
+                data = json.load(f)
+                self.from_dict(data)
+                return True
+        except:
+            return False
+    
     def add_printer(self, id: str, client: PrinterClient) -> bool:
         # 确保id不重复
         for p in self.printer_list:

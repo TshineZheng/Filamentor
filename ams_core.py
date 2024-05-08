@@ -24,6 +24,8 @@ class AmsCore(object):
         self.fila_changing = False
         self.app_config = app_config
         self.printer_client = app_config.get_printer(use_printer)
+        self.printer_client.on_action = self.on_printer_action    
+
         self.broken_detects = app_config.get_printer_broken_detect(use_printer)
 
         if self.broken_detects is None or len(self.broken_detects) == 0:

@@ -3,3 +3,4 @@
 logs/filamentor.log
 filamentor_config.json
 test/test_private.py
+logs/*

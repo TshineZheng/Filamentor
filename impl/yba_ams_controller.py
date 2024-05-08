@@ -4,6 +4,8 @@ from typing import List
 from controller import ChannelAction, Controller
 import socket
 
+from log import LOGI
+
 CH_MAP = [1, 2, 3, 4]  # 通道映射表
 ams_head = b'\x2f\x2f\xff\xfe\x01\x02'
 
@@ -61,7 +63,7 @@ class YBAAMSController(Controller):
                 self.sock.shutdown(socket.SHUT_RDWR)
                 self.sock.close()
             except Exception as e:
-                print(f"关闭socket失败: {e}")
+                LOGI(f"关闭socket失败: {e}")
 
     # 向AMS发送指令
     def send_ams(self, data):
@@ -74,10 +76,10 @@ class YBAAMSController(Controller):
                 self.sock.sendall(data)
                 return
             except Exception as e:
-                print(f"向AMS发送指令失败: {e}")
-                print("尝试重新连接...")
+                LOGI(f"向AMS发送指令失败: {e}")
+                LOGI("尝试重新连接...")
                 self.connect()
-                print("重新连接成功，尝试再次发送")
+                LOGI("重新连接成功，尝试再次发送")
 
     def ams_control(self, ch, fx):
         self.send_ams(ams_head + bytes([ch]) + bytes([fx]))
@@ -96,11 +98,11 @@ class YBAAMSController(Controller):
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect((server_ip, server_port))
-                print("连接到AMS成功")
+                LOGI("连接到AMS成功")
                 return sock
             except Exception as e:
-                print(f"连接到AMS失败: {e}")
-                print("5秒后尝试重新连接...")
+                LOGI(f"连接到AMS失败: {e}")
+                LOGI("5秒后尝试重新连接...")
                 time.sleep(5)
 
     def heartbeat(self):

@@ -4,7 +4,7 @@ from typing import List
 from controller import ChannelAction, Controller
 import socket
 
-from log import LOGE, LOGI
+from utils.log import LOGE, LOGI
 
 CH_MAP = [1, 2, 3, 4]  # 通道映射表
 ams_head = b'\x2f\x2f\xff\xfe\x01\x02'

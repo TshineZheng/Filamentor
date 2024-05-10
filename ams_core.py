@@ -6,7 +6,7 @@ from typing import List
 import printer_client as printer
 from app_config import AppConfig
 from controller import ChannelAction, Controller
-from log import LOGD, LOGI
+from utils.log import LOGD, LOGI
 
 LOAD_TIMEOUT = 30   # 装料超时，超时会尝试抖动耗材
 LOAD_WARNING = 120  # 装料失败警告时间
@@ -179,6 +179,19 @@ class AMSCore(object):
             pass
 
         if action == printer.Action.FILAMENT_SWITCH_1:
+            pass
+
+        if action == printer.Action.PREPARE:
+            LOGI("开始打印")
+            self.change_count = 0 # 开始打印的时候把换色次数清零            
+
+        if action == printer.Action.FINISH:
+            pass
+
+        if action == printer.Action.FAILED:
+            pass
+
+        if action == printer.Action.FIRST_FILAMENT:
             pass
 
     def start(self):

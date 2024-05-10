@@ -9,6 +9,10 @@ class Action(Enum):
     CHANGE_FILAMENT = 0  # 更换通道
     FILAMENT_SWITCH_0 = 1  # 卸载完成
     FILAMENT_SWITCH_1 = 2  # 装载完成
+    PREPARE = 3  # 准备开始
+    FINISH = 4  # 打印完成
+    FAILED = 5  # 打印失败
+    FIRST_FILAMENT = 6  # 第一次颜色
 
 
 class FilamentState(Enum):
@@ -45,6 +49,15 @@ class PrinterClient(ABC):
 
         Args:
             pre_tem (int, optional): 可用于卸载时提前升温，加快换色速度. Defaults to 255.
+        """
+        pass
+
+    @abstractmethod
+    def change_filament(self, next_fila: int):
+        """主动调用换色
+
+        Args:
+            next_fila (int): 下一个颜色通道序号
         """
         pass
 

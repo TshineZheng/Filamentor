@@ -1,11 +1,5 @@
 import json
-
 import microdot as dot
-import route_config as config
-import route_controller as controller
-import route_detect as detect
-import route_printer as printer
-
 
 def json_response(data=None, code=200, msg="OK", error:Exception=None):
     """返回JSON格式的响应，包含固定的code和msg字段"""
@@ -20,17 +14,25 @@ def json_response(data=None, code=200, msg="OK", error:Exception=None):
     if error is not None:
         response_data['error'] = str(error)
 
-    return dot.Response(json.dumps(response_data), content_type='application/json', status=code)
+    return dot.Response(json.dumps(response_data), code, headers={'Content-Type': 'application/json'})
 
 def error_response(error: Exception, msg='error'):
     return json_response(error=error, msg= msg)
 
 app = dot.Microdot()
 
-app.mount('/api/printer', printer)
-app.mount('/api/controller', controller)
-app.mount('/api/detect', detect)
-app.mount('/api/config', config)
+def run():
+    import web.route_config as config
+    import web.route_controller as controller
+    import web.route_detect as detect
+    import web.route_printer as printer
 
-if __name__ == '__main__':
-    app.run(port=80)
+    app.mount(printer.app, '/api/printer')
+    app.mount(controller.app, '/api/controller')
+    app.mount(detect.app, '/api/detect')
+    app.mount(config.app, '/api/config')
+    
+    app.run(port=717)
+
+def stop():
+    app.shutdown()

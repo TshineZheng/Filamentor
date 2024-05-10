@@ -1,6 +1,6 @@
 import time
 from broken_detect import BrokenDetect
-from log import LOGE, LOGI
+from utils.log import LOGE, LOGI
 from mqtt_config import MQTTConfig
 import paho.mqtt.client as mqtt
 

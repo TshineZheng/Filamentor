@@ -6,7 +6,7 @@ from typing import Any, Callable
 import paho.mqtt.client as mqtt
 
 from broken_detect import BrokenDetect
-from log import LOGD, LOGE, LOGI, LOGW
+from utils.log import LOGD, LOGE, LOGI, LOGW
 from printer_client import Action, FilamentState, PrinterClient
 
 # 定义服务器信息和认证信息
@@ -16,12 +16,12 @@ BAMBU_CLIENT_ID = "open-ams"
 USERNAME = "bblp"
 
 bambu_resume = '{"print":{"command":"resume","sequence_id":"1"},"user_id":"1"}'
+bambu_pause = '{"print": {"sequence_id": "0","command": "pause","param": ""}}'
 bambu_unload = '{"print":{"command":"ams_change_filament","curr_temp":220,"sequence_id":"1","tar_temp":220,"target":255},"user_id":"1"}'
 bambu_load = '{"print":{"command":"ams_change_filament","curr_temp":220,"sequence_id":"1","tar_temp":220,"target":254},"user_id":"1"}'
 bambu_done = '{"print":{"command":"ams_control","param":"done","sequence_id":"1"},"user_id":"1"}'
 bambu_clear = '{"print":{"command": "clean_print_error","sequence_id":"1"},"user_id":"1"}'
 bambu_status = '{"pushing": {"sequence_id": "0", "command": "pushall"}}'
-
 
 class BambuClientConfig(object):
 
@@ -90,6 +90,9 @@ class BambuClient(PrinterClient):
     def publish_clear(self):
         self.client.publish(self.TOPIC_PUBLISH, bambu_clear)
 
+    def publish_pause(self):
+        self.client.publish(self.TOPIC_PUBLISH, bambu_pause)
+
     # noinspection PyUnusedLocal
     def on_connect(self, client, userdata, flags, rc, properties):
         if rc == 0:
@@ -144,18 +147,24 @@ class BambuClient(PrinterClient):
                     self.filament_state = FilamentState.YES
                     self.on_action(Action.FILAMENT_SWITCH_1, None)
 
+            if 'command' in json_data["print"]:
+                if json_data["print"]["command"] == 'project_file':
+                    if 'param' in json_data["print"] and 'url' in json_data['print']:
+                        p = json_data['print']['param']
+                        url = json_data['print']['url']
+                        ci = BambuClient.get_first_fila_from_gcode(url, p)
+                        self.on_action(Action.FIRST_FILAMENT, ci)
+
             if 'gcode_state' in json_data["print"]:
                 if json_data["print"]["gcode_state"] == "PREPARE":
-                    # TODO: 准备开始打印
-                    pass
+                    self.on_action(Action.PREPARE, None)
 
                 if json_data["print"]["gcode_state"] == "FINISH":
-                    # TODO: 打印完成
-                    pass
+                    self.on_action(Action.FINISH, None)
 
                 if json_data['print']['gcode_state'] == 'FAILED':
                     # TODO 打印失败? 打印终止
-                    pass
+                    self.on_action(Action.FAILED, None)
 
     def refresh_status(self):
         self.publish_status()
@@ -187,6 +196,79 @@ class BambuClient(PrinterClient):
             self.fbd = BambuBrokenDetect(self)
 
         return self.fbd
+    
+    def change_filament(self, next_fila: int, change_temp: int = 255):
+        self.publish_pause()    # 先让打印机暂停
+        # 开始执行换料
+        self .publish_gcode(
+            f"""
+            M106 P1 S0
+            M106 P2 S0
+            M109 S{change_temp}
+
+            M17 S
+            M17 X1.1
+            G1 X180 F18000
+            G1 X201 F1000
+            G1 E-2 F500
+            G1 X180 F3000
+            G1 X-13.5 F18000
+            M17 R
+
+            M73 P101 R{next_fila}
+            M400 U1
+            M400
+
+            M1002 set_filament_type:UNKNOWN
+            M109 S{change_temp}
+            M106 P1 S60
+
+            """.replace('\n', '\\n')
+        )
+
+    @staticmethod
+    def get_first_fila_from_gcode(zip_url: str, file_path: str) -> int:
+        import requests
+        import zipfile
+        import io
+
+        # 发送GET请求并获取ZIP文件的内容
+        response = requests.get(zip_url)
+
+        # 确保请求成功
+        if response.status_code == 200:
+            # 使用BytesIO读取下载的内容
+            zip_data = io.BytesIO(response.content)
+            # 使用zipfile读取ZIP文件
+            with zipfile.ZipFile(zip_data) as zip_file:
+                # 获取ZIP文件中的所有文件名列表
+                file_names = zip_file.namelist()
+                # 遍历文件名列表
+                for file_name in file_names:
+                    # 如果文件名符合您要查找的路径
+                    if file_path == file_name:
+                        # 打开文本文件
+                        with zip_file.open(file_name) as file:
+                            # 逐行读取文件内容
+                            for line in file:
+                                # 将bytes转换为str
+                                line_str = line.decode('utf-8')
+                                # 检查是否包含特定字符串
+                                if line_str.startswith('M620 S'):
+                                    # 找到匹配的行，返回内容
+                                    text =  line_str.strip()
+                                    import re
+                                    # 正则表达式模式，用于匹配'M620 S'后面的数字，直到遇到非数字字符
+                                    pattern = r'M620 S(\d+)'
+                                    # 搜索匹配的内容
+                                    match = re.search(pattern, text)
+                                    # 如果找到匹配项，则提取数字
+                                    if match:
+                                        number = match.group(1)
+                                        print(number)  # 输出匹配到的数字
+                                        return int(int(number))
+        return -1
+
 
 class BambuBrokenDetect(BrokenDetect):
     def type_name() -> str:

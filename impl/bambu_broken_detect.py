@@ -1,15 +1,13 @@
-from typing import TYPE_CHECKING
-
 from broken_detect import BrokenDetect
 
     
 class BambuBrokenDetect(BrokenDetect):
-    import impl.bambu_client as BambuClient
+    import impl.bambu_client as bambu
 
     def type_name() -> str:
         return "bambu_broken_detect"
 
-    def __init__(self, bambu_client: BambuClient):
+    def __init__(self, bambu_client: bambu.BambuClient):
         super().__init__()
         self.bambu_client = bambu_client
 

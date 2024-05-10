@@ -178,7 +178,7 @@ class AppConfig:
                 data = json.load(f)
                 return AppConfig.from_dict(data)
         except:
-            return None
+            return cls([], [], [], [], [],MQTTConfig())
     
     def add_printer(self, id: str, client: PrinterClient) -> bool:
         # 确保id不重复

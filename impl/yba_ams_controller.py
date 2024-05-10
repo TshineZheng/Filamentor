@@ -68,7 +68,7 @@ class YBAAMSController(Controller):
             except Exception as e:
                 LOGE(f"关闭socket失败: {e}")
 
-    # 向AMS发送指令
+    # 向YBA发送指令
     def send_ams(self, data):
         """发送数据到服务器，如果连接断开，自动重新连接并重新发送"""
         if self.sock is None:
@@ -79,7 +79,7 @@ class YBAAMSController(Controller):
                 self.sock.sendall(data)
                 return
             except Exception as e:
-                LOGE(f"向AMS发送指令失败: {e}")
+                LOGE(f"向YBA发送指令失败: {e}")
                 LOGE("尝试重新连接...")
                 self.connect()
                 LOGE("重新连接成功，尝试再次发送")
@@ -101,10 +101,10 @@ class YBAAMSController(Controller):
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect((server_ip, server_port))
-                LOGI("连接到AMS成功")
+                LOGI("连接到YBA成功")
                 return sock
             except Exception as e:
-                LOGE(f"连接到AMS失败: {e}")
+                LOGE(f"连接到YBA失败: {e}")
                 LOGE("5秒后尝试重新连接...")
                 time.sleep(5)
 

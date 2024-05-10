@@ -37,8 +37,8 @@ class BambuClient(PrinterClient):
     def type_name() -> str:
         return "bambu_client"
 
-    def __init__(self, config: BambuClientConfig, on_action: Callable[[Action, Any], None] = None):
-        super().__init__(on_action)
+    def __init__(self, config: BambuClientConfig):
+        super().__init__()
 
         self.fbd = None
         self.config = config
@@ -62,13 +62,13 @@ class BambuClient(PrinterClient):
         self.client = client
 
     @classmethod
-    def from_dict(cls, config: dict, on_action: Callable[[Action, Any], None] = None):
+    def from_dict(cls, config: dict):
         return cls(
             BambuClientConfig(
                 config["printer_ip"],
                 config["lan_password"],
                 config["device_serial"]
-            ), on_action)
+            ))
 
     def to_dict(self) -> dict:
         return {

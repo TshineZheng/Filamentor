@@ -3,7 +3,7 @@ from typing import List
 
 from broken_detect import BrokenDetect
 from controller import Controller
-from impl.bambu_client import BambuClient, BambuClientConfig
+from impl.bambu_client import BambuClient
 from impl.mqtt_broken_detect import MQTTBrokenDetect
 from impl.yba_ams_controller import YBAAMSController
 from mqtt_config import MQTTConfig

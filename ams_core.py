@@ -21,6 +21,7 @@ class AMSCore(object):
         cur_channel: int,
         change_tem: int,
     ) -> None:
+        self.use_printer = use_printer
         self.fila_cur = cur_channel
         self.fila_next = 0
         self.change_count = 0
@@ -28,8 +29,7 @@ class AMSCore(object):
         self.fila_changing = False
         self.app_config = app_config
         self.printer_client = app_config.get_printer(use_printer)
-        self.printer_client.on_action = self.on_printer_action    
-
+        self.printer_client.add_on_action(self.on_printer_action)
         self.broken_detects = app_config.get_printer_broken_detect(use_printer)
 
         if self.broken_detects is None or len(self.broken_detects) == 0:
@@ -202,6 +202,8 @@ class AMSCore(object):
         c,i = self.channels[self.fila_cur]
         if c.is_initiative_push(i):
             c.control(i, ChannelAction.PUSH)
+
+        LOGI(f'{self.use_printer} AMS 启动')
 
     def stop(self):
         pass

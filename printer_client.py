@@ -22,14 +22,25 @@ class FilamentState(Enum):
 
 
 class PrinterClient(ABC):
-    def __init__(self, on_action: Callable[[Action, Any], None]):
-        self.on_action = on_action
+    def __init__(self):
         self.filament_state = FilamentState.UNKNOWN
+        # action 回调列表
+        self.action_callbacks: list[Callable[[Action, Any], None]] = []
 
     @staticmethod
     @abstractmethod
     def type_name() -> str:
         pass
+
+    def add_on_action(self, callback: Callable[[Action, Any], None]):
+        self.action_callbacks.append(callback)
+
+    def remove_on_action(self, callback: Callable[[Action, Any], None]):
+        self.action_callbacks.remove(callback)
+
+    def on_action(self, action: Action, data: Any):
+        for callback in self.action_callbacks:
+            callback(action, data)
 
     @abstractmethod
     def start(self):

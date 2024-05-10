@@ -1,6 +1,6 @@
 import time
 from broken_detect import BrokenDetect
-from log import LOGI
+from log import LOGE, LOGI
 from mqtt_config import MQTTConfig
 import paho.mqtt.client as mqtt
 
@@ -55,20 +55,20 @@ class MQTTBrokenDetect(BrokenDetect):
             LOGI("连接MQTT成功")
             self.client.subscribe(self.topic, qos=1)
         else:
-            LOGI(f"连接MQTT失败，错误代码 {rc}")
+            LOGE(f"连接MQTT失败，错误代码 {rc}")
 
     def on_disconnect(self, client, userdata, rc, properties):
-        LOGI("MQTT连接已断开，正在尝试重新连接")
+        LOGE("MQTT连接已断开，正在尝试重新连接")
         self.reconnect(client)
 
     def reconnect(self, client, delay=3):
         while True:
-            LOGI("尝试重新连接MQTT...")
+            LOGE("尝试重新连接MQTT...")
             try:
                 client.reconnect()
                 break  # 重连成功则退出循环
             except:
-                LOGI(f"重连MQTT失败 {delay} 秒后重试...")
+                LOGE(f"重连MQTT失败 {delay} 秒后重试...")
                 time.sleep(delay)  # 等待一段时间后再次尝试
 
     def on_message(self, client, userdata, message):

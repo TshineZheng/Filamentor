@@ -1,8 +1,7 @@
 import time
 
-from ams_core import AmsCore
+from ams_core import AMSCore
 from app_config import AppConfig
-from controller import ChannelAction
 from loguru import logger
 import sys
 
@@ -32,10 +31,8 @@ if __name__ == '__main__':
     for d in app_config.detect_list:
         d.detect.start()
 
-    ams = AmsCore(app_config, 'bambu-1', CUR_CHANNEL, CHANGE_TEM)
-    ams.run()
-
-    ams.driver_control(ams.fila_cur, ChannelAction.PUSH)
+    ams = AMSCore(app_config, 'bambu-1', CUR_CHANNEL, CHANGE_TEM)
+    ams.start()
 
     try:
         while True:

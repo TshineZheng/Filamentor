@@ -7,7 +7,7 @@ import paho.mqtt.client as mqtt
 
 from broken_detect import BrokenDetect
 from impl.bambu_broken_detect import BambuBrokenDetect
-from log import LOGD, LOGI
+from log import LOGD, LOGE, LOGI, LOGW
 from printer_client import Action, FilamentState, PrinterClient
 
 # 定义服务器信息和认证信息
@@ -98,21 +98,21 @@ class BambuClient(PrinterClient):
             # 连接成功后订阅主题
             client.subscribe(self.TOPIC_SUBSCRIBE, qos=1)
         else:
-            LOGI(f"连接竹子失败，错误代码 {rc}")
+            LOGE(f"连接竹子失败，错误代码 {rc}")
 
     # noinspection PyUnusedLocal
     def on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
-        LOGI("连接已断开，请检查打印机状态，以及是否有其它应用占用了打印机")
+        LOGE("连接已断开，请检查打印机状态，以及是否有其它应用占用了打印机")
         self.reconnect(client)
 
     def reconnect(self, client, delay=3):
         while True:
-            LOGI("尝试重新连接竹子...")
+            LOGE("尝试重新连接竹子...")
             try:
                 client.reconnect()
                 break  # 重连成功则退出循环
             except:
-                LOGI(f"重连竹子失败 {delay} 秒后重试...")
+                LOGE(f"重连竹子失败 {delay} 秒后重试...")
                 time.sleep(delay)  # 等待一段时间后再次尝试
 
     def on_message(self, client, userdata, message):
@@ -121,28 +121,42 @@ class BambuClient(PrinterClient):
             json_data = json.loads(payload)
             LOGD(f'bambu_mqtt_msg -> {payload}')
         except json.JSONDecodeError:
-            LOGI("JSON解析失败")
+            LOGE("JSON解析失败")
             return
 
         if "print" in json_data:
-            if "gcode_state" in json_data["print"]:
-                if "mc_percent" in json_data["print"] and "mc_remaining_time" in json_data["print"]:
-                    if json_data["print"]["mc_percent"] == 101:  # 换色指令
-                        if json_data["print"]["gcode_state"] == "PAUSE":  # 暂停状态
-                            filament_next = json_data["print"]["mc_remaining_time"]  # 更换通道
-                            self.on_action(Action.CHANGE_FILAMENT, filament_next)
-                        else:
-                            LOGD('收到换色指令，但打印机不是暂停状态，重新刷新状态')
-                            # 有一种情况是暂停了，但打印机不会发消息过来，所以要确保打印机是在暂停状态再执行
-                            self.publish_status()
+            if "mc_percent" in json_data["print"] and "mc_remaining_time" in json_data["print"]:
+                if json_data["print"]["mc_percent"] == 101:  # 换色指令
+                    if "gcode_state" in json_data["print"] and json_data["print"]["gcode_state"] == "PAUSE":  # 暂停状态
+                        filament_next = json_data["print"]["mc_remaining_time"]  # 更换通道
+                        self.on_action(Action.CHANGE_FILAMENT, filament_next)
+                    else:
+                        # 有一种情况是暂停了，但打印机不会发消息过来，所以要确保打印机是在暂停状态再执行
+                        # FIXME: 还有一种情况是已经恢复打印，但进度没有更新，导致一直触发换色指令，也就会一直尝试获取打印状态，直到下次换色，或进度更新，可能需要通过gcode修复(bambu)
+                        LOGW('收到换色指令，但打印机不是暂停状态，重新刷新状态')
+                        self.publish_status()
 
             if "hw_switch_state" in json_data["print"]:
                 if json_data["print"]["hw_switch_state"] == 0:
-                    self.on_action(Action.FILAMENT_SWITCH_0, None)
                     self.filament_state = FilamentState.NO
+                    self.on_action(Action.FILAMENT_SWITCH_0, None)
+                    
                 if json_data["print"]["hw_switch_state"] == 1:
-                    self.on_action(Action.FILAMENT_SWITCH_1, None)
                     self.filament_state = FilamentState.YES
+                    self.on_action(Action.FILAMENT_SWITCH_1, None)
+
+            if 'gcode_state' in json_data["print"]:
+                if json_data["print"]["gcode_state"] == "PREPARE":
+                    # TODO: 准备开始打印
+                    pass
+
+                if json_data["print"]["gcode_state"] == "FINISH":
+                    # TODO: 打印完成
+                    pass
+
+                if json_data['print']['gcode_state'] == 'FAILED':
+                    # TODO 打印失败? 打印终止
+                    pass
 
     def refresh_status(self):
         self.publish_status()

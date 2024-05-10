@@ -8,12 +8,12 @@ from app_config import AppConfig
 from controller import ChannelAction, Controller
 from log import LOGD, LOGI
 
-LOAD_TIMEOUT = 30   # 装料超时
+LOAD_TIMEOUT = 30   # 装料超时，超时会尝试抖动耗材
 LOAD_WARNING = 120  # 装料失败警告时间
-UNLOAD_TIMEOUT = 30 # 退料超时
+UNLOAD_TIMEOUT = 30 # 退料超时，超时会尝试抖动耗材
 UNLOAD_WARNING = 120 # 退料失败警告时间
 
-class AmsCore(object):
+class AMSCore(object):
     def __init__(
         self,
         app_config: AppConfig,
@@ -81,9 +81,9 @@ class AmsCore(object):
             target=self.filament_change, args=(next_filament,))
         self.thread.start()
 
-    def fila_shake(self, channel:int, action: ChannelAction, time=0.5):
+    def fila_shake(self, channel:int, action: ChannelAction, shake_time=1):
         self.driver_control(channel, ChannelAction.PULL if action == ChannelAction.PUSH else ChannelAction.PUSH)
-        time.sleep(time)
+        time.sleep(shake_time)
         self.driver_control(channel, ChannelAction.PUSH if action == ChannelAction.PUSH else ChannelAction.PULL)
 
     def filament_change(self, next_filament: int):
@@ -181,8 +181,14 @@ class AmsCore(object):
         if action == printer.Action.FILAMENT_SWITCH_1:
             pass
 
-    def run(self):
-        pass
+    def start(self):
+        #TODO: 判断打印机是否有料，如果有料则仅送料，否则需要送料并调用打印机加载材料
+        #TODO 如果可以，最好能自主判断当前打印机的料是哪个通道
+        
+        # 如果通道是主动送料，则启动时，开始送料
+        c,i = self.channels[self.fila_cur]
+        if c.is_initiative_push(i):
+            c.control(i, ChannelAction.PUSH)
 
     def stop(self):
         pass

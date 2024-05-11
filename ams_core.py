@@ -19,16 +19,15 @@ class AMSCore(object):
         app_config: AppConfig,
         use_printer: str,
         cur_channel: int,
-        change_tem: int,
     ) -> None:
         self.use_printer = use_printer
         self.fila_cur = cur_channel
         self.fila_next = 0
         self.change_count = 0
-        self.change_tem = change_tem
         self.fila_changing = False
         self.app_config = app_config
         self.printer_client = app_config.get_printer(use_printer)
+        self.change_tem = app_config.get_printer_change_tem(use_printer)
         self.printer_client.add_on_action(self.on_printer_action)
         self.broken_detects = app_config.get_printer_broken_detect(use_printer)
 
@@ -40,7 +39,7 @@ class AMSCore(object):
         for c in app_config.get_printer_channel_settings(use_printer):
             self.channels.append([app_config.get_controller(c.controller_id), c.channel])
 
-        LOGD(f'打印机: {use_printer}, 通道数量{len(self.channels)}, 断料检测器数量{len(self.broken_detects)}')
+        LOGD(f'打印机: {use_printer}, 通道数量: {len(self.channels)}, 断料检测器数量: {len(self.broken_detects)}, 换色温度: {self.change_tem}')
         # 打印所有通道
         for c,i in self.channels:
             LOGD(f'通道: {c.type_name()} {i}')

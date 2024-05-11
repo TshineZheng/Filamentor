@@ -65,25 +65,28 @@ class DetectRelation:
 
 
 class IDPrinterClient:
-    def __init__(self, id: str, client: PrinterClient) -> None:
+    def __init__(self, id: str, client: PrinterClient, change_temp: int = 255) -> None:
         self.id = id
         self.client = client
+        self.change_temp = change_temp
 
     def to_dict(self):
         return {
             "id": self.id,
             'type': self.client.type_name(),
-            "info": self.client.to_dict()
+            "info": self.client.to_dict(),
+            "change_temp": self.change_temp
         }
 
     @classmethod
     def from_dict(cls, data: dict):
         id = data["id"]
         type = data["type"]
+        change_temp = data["change_temp"]
         client = None
         if type == BambuClient.type_name():
             client = BambuClient.from_dict(data["info"])
-        return cls(id, client)
+        return cls(id, client, change_temp)
 
 
 class IDController:
@@ -129,6 +132,9 @@ class IDBrokenDetect:
             detect = MQTTBrokenDetect.from_dict(data["info"])
         return cls(id, detect)
 
+class AMSSettings:
+    def __init__(self, cur_filament: int, change_temp: int) -> None:
+        pass
 
 class AppConfig:
 
@@ -136,15 +142,15 @@ class AppConfig:
                  printers: List[IDPrinterClient],
                  controllers: List[IDController],
                  detects: List[IDBrokenDetect],
-                 channel_set: List[ChannelRelation],
-                 detect_set: List[DetectRelation],
+                 channel_rel: List[ChannelRelation],
+                 detect_rel: List[DetectRelation],
                  mqtt_config: MQTTConfig
                  ) -> None:
         self.printer_list = printers
         self.controller_list = controllers
         self.detect_list = detects
-        self.channel_settings = channel_set
-        self.detect_settings = detect_set
+        self.channel_relations = channel_rel
+        self.detect_relations = detect_rel
         self.mqtt_config = mqtt_config
 
     @classmethod
@@ -152,18 +158,18 @@ class AppConfig:
         printers = [IDPrinterClient.from_dict(i) for i in data["printer_list"]]
         controllers = [IDController.from_dict(i) for i in data["controller_list"]]
         detects = [IDBrokenDetect.from_dict(i) for i in data["detect_list"]]
-        channel_set = [ChannelRelation.from_dict(i) for i in data["channel_settings"]]
-        detect_set = [DetectRelation.from_dict(i) for i in data["detect_settings"]]
+        channel_rel = [ChannelRelation.from_dict(i) for i in data["channel_relations"]]
+        detect_rel = [DetectRelation.from_dict(i) for i in data["detect_relations"]]
         mqtt_config = MQTTConfig.from_dict(data["mqtt_config"])
-        return cls(printers, controllers, detects, channel_set, detect_set, mqtt_config)
+        return cls(printers, controllers, detects, channel_rel, detect_rel, mqtt_config)
 
     def to_dict(self):
         return {
             "printer_list": [i.to_dict() for i in self.printer_list],
             "controller_list": [i.to_dict() for i in self.controller_list],
             "detect_list": [i.to_dict() for i in self.detect_list],
-            "channel_settings": [i.to_dict() for i in self.channel_settings],
-            "detect_settings": [i.to_dict() for i in self.detect_settings],
+            "channel_relations": [i.to_dict() for i in self.channel_relations],
+            "detect_relations": [i.to_dict() for i in self.detect_relations],
             "mqtt_config": self.mqtt_config.to_dict()
         }
     
@@ -194,12 +200,12 @@ class AppConfig:
             if p.id == id:
                 self.printer_list.remove(p)
                 # 删除所有控制器和检测的引用
-                for c in self.channel_settings[:]:
+                for c in self.channel_relations[:]:
                     if c.printer_id == id:
-                        self.channel_settings.remove(c)
-                for d in self.detect_settings[:]:
+                        self.channel_relations.remove(c)
+                for d in self.detect_relations[:]:
                     if d.printer_id == id:
-                        self.detect_settings.remove(d)
+                        self.detect_relations.remove(d)
                 return
 
     
@@ -217,9 +223,9 @@ class AppConfig:
             if p.id == id:
                 self.controller_list.remove(p)
                 # 删除所有该控制器的通道引用
-                for c in self.channel_settings[:]:
+                for c in self.channel_relations[:]:
                     if c.controller_id == id:
-                        self.channel_settings.remove(c)
+                        self.channel_relations.remove(c)
 
     def add_detect(self, id: str, detect: BrokenDetect) -> bool:
         # 确保id不重复
@@ -235,9 +241,9 @@ class AppConfig:
             if p.id == id:
                 self.detect_list.remove(p)
                 # 删除所有检测器的引用
-                for c in self.detect_settings[:]:
+                for c in self.detect_relations[:]:
                     if c.detect_id == id:
-                        self.detect_settings.remove(c)
+                        self.detect_relations.remove(c)
 
     def add_channel_setting(self, printer_id: str, controller_id: str, channel: int) -> bool:
         if not self.is_printer_exist(printer_id):
@@ -249,13 +255,13 @@ class AppConfig:
         if self.is_channel_relation_exist(controller_id, channel):
             return False
         
-        self.channel_settings.append(ChannelRelation(printer_id, controller_id, channel))
+        self.channel_relations.append(ChannelRelation(printer_id, controller_id, channel))
         return True
 
     def remove_channel_setting(self, printer_id: str, controller_id: str, channel_id: int):
-        for p in self.channel_settings[:]:
+        for p in self.channel_relations[:]:
             if controller_id == p.controller_id and channel_id == p.channel:
-                self.channel_settings.remove(p)
+                self.channel_relations.remove(p)
 
     def add_detect_setting(self, printer_id: str, detect_id: str) -> bool:
         if not self.is_detect_exist(detect_id):
@@ -265,13 +271,13 @@ class AppConfig:
         if self.is_detect_relation_exist(detect_id):
             return False
         
-        self.detect_settings.append(DetectRelation(printer_id, detect_id))
+        self.detect_relations.append(DetectRelation(printer_id, detect_id))
         return True
 
     def remove_detect_setting(self, printer_id: str, detect_id: str):
-        for p in self.detect_settings[:]:
+        for p in self.detect_relations[:]:
             if printer_id == p.printer_id and detect_id == p.detect_id:
-                self.detect_settings.remove(p)
+                self.detect_relations.remove(p)
 
     def is_printer_exist(self, id: str) -> bool:
         for p in self.printer_list:
@@ -293,28 +299,34 @@ class AppConfig:
         return False
     
     def is_channel_relation_exist(self, controller_id: str, channel_index: int) -> bool:
-        for p in self.channel_settings:
+        for p in self.channel_relations:
             if p.controller_id == controller_id and p.channel == channel_index:
                 return True
         return False
     
     def is_detect_relation_exist(self, detect_id: str) -> bool:
-        for p in self.detect_settings:
+        for p in self.detect_relations:
             if p.detect_id == detect_id:
                 return True
         return False
     
     def get_printer_channel_settings(self, printer_id: str) -> List[ChannelRelation]:
-        return [p for p in self.channel_settings if p.printer_id == printer_id]
+        return [p for p in self.channel_relations if p.printer_id == printer_id]
 
     def get_printer(self, printer_id: str) -> PrinterClient:
         for p in self.printer_list:
             if p.id == printer_id:
                 return p.client
         return None
+
+    def get_printer_change_tem(self, printer_id: str) -> int:
+        for p in self.printer_list:
+            if p.id == printer_id:
+                return p.change_temp
+        return 255
     
     def get_printer_broken_detect(self, printer_id: str) -> List[BrokenDetect]:
-        t = [p for p in self.detect_settings if p.printer_id == printer_id]
+        t = [p for p in self.detect_relations if p.printer_id == printer_id]
         return [p.detect for p in self.detect_list if p.id in [d.detect_id for d in t]]
 
 

@@ -67,10 +67,10 @@ def test_remove_printer():
     for i in config.printer_list:
         assert i.id != 'bambu_1'
     
-    for i in config.channel_settings:
+    for i in config.channel_relations:
         assert i.printer_id != 'bambu_1'
 
-    for i in config.detect_settings:
+    for i in config.detect_relations:
         assert i.printer_id != 'bambu_1'
 
 def test_add_controller():
@@ -87,7 +87,7 @@ def test_remove_controller():
     for i in config.controller_list:
         assert i.id != 'yba_ams_1'
     
-    for i in config.channel_settings:
+    for i in config.channel_relations:
         assert i.controller_id != 'yba_ams_1'
 
 def test_add_detect():
@@ -125,7 +125,7 @@ def test_add_channel_relation():
 def test_remove_channel_relation():
     config = make_config()
     config.remove_channel_setting('bambu_1', 'yba_ams_1', 0)
-    for i in config.channel_settings:
+    for i in config.channel_relations:
         assert not (i.printer_id == 'bambu_1' and i.controller_id == 'yba_ams_1' and i.channel==0)
 
 def test_add_detect_relation():
@@ -143,6 +143,6 @@ def test_add_detect_relation():
 def test_remove_detect_relation():
     config = make_config()
     config.remove_detect_setting('bambu_1', 'mqtt_detect_1')
-    for i in config.detect_settings:
+    for i in config.detect_relations:
         assert i.detect_id != 'mqtt_detect_1'
 

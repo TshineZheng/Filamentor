@@ -175,7 +175,7 @@ class AppConfig:
     
     def save(self):
         with open(f'{consts.STORAGE_PATH}filamentor_config.json', 'w') as f:
-            json.dump(self.to_dict(), f)
+            json.dump(self.to_dict(), f, ensure_ascii=False, indent=4)
     
     @classmethod
     def load(cls):

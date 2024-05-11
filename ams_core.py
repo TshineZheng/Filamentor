@@ -185,18 +185,13 @@ class AMSCore(TAGLOG):
         if action == printer.Action.FILAMENT_SWITCH_1:
             pass
 
-        if action == printer.Action.PREPARE:
-            self.LOGI("开始打印")
-            self.change_count = 0 # 开始打印的时候把换色次数清零            
-
-        if action == printer.Action.FINISH:
-            pass
-
-        if action == printer.Action.FAILED:
-            pass
-
-        if action == printer.Action.FIRST_FILAMENT:
-            pass
+        if action == printer.Action.START:
+            task_name = data['subtask_name']
+            first_filament = data['first_filament']
+            self.LOGI(f"接到打印任务：{task_name}，第一个通道: {first_filament + 1}")
+            # if first_filament != self.fila_cur:
+            #     self.LOGI("打印的第一个通道不是AMS当前通道, 需要换色")
+            #     self.printer_client.change_filament(first_filament)
 
     def start(self):
         #TODO: 判断打印机是否有料，如果有料则仅送料，否则需要送料并调用打印机加载材料

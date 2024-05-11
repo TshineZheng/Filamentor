@@ -149,22 +149,15 @@ class BambuClient(PrinterClient):
 
             if 'command' in json_data["print"]:
                 if json_data["print"]["command"] == 'project_file':
-                    if 'param' in json_data["print"] and 'url' in json_data['print']:
+                    if 'param' in json_data["print"] and 'url' in json_data['print'] and 'subtask_name' in json_data['print']:
                         p = json_data['print']['param']
                         url = json_data['print']['url']
+                        subtask_name = json_data['print']['subtask_name']
                         ci = BambuClient.get_first_fila_from_gcode(url, p)
-                        self.on_action(Action.FIRST_FILAMENT, ci)
-
-            if 'gcode_state' in json_data["print"]:
-                if json_data["print"]["gcode_state"] == "PREPARE":
-                    self.on_action(Action.PREPARE, None)
-
-                if json_data["print"]["gcode_state"] == "FINISH":
-                    self.on_action(Action.FINISH, None)
-
-                if json_data['print']['gcode_state'] == 'FAILED':
-                    # TODO 打印失败? 打印终止
-                    self.on_action(Action.FAILED, None)
+                        self.on_action(Action.START, {
+                            'first_filament': ci,
+                            'subtask_name': subtask_name
+                        })
 
     def refresh_status(self):
         self.publish_status()
@@ -199,13 +192,17 @@ class BambuClient(PrinterClient):
     
     def change_filament(self, next_fila: int, change_temp: int = 255):
         self.publish_pause()    # 先让打印机暂停
+        time.sleep(5)
         # 开始执行换料
-        self .publish_gcode(
-            f"""
+
+        filament_e_feedrate = 224
+        
+        code = f"""
             M106 P1 S0
             M106 P2 S0
             M109 S{change_temp}
 
+            ; cut filament
             M17 S
             M17 X1.1
             G1 X180 F18000
@@ -215,16 +212,40 @@ class BambuClient(PrinterClient):
             G1 X-13.5 F18000
             M17 R
 
+            ; Filamentor - Change Filament
             M73 P101 R{next_fila}
             M400 U1
             M400
 
+            G92 E0
+
+            ; FLUSH_START
+            M400
             M1002 set_filament_type:UNKNOWN
             M109 S{change_temp}
             M106 P1 S60
+            G1 E23.7 F{filament_e_feedrate}
+            ; FLUSH_END
+
+            G1 E-2 F1800
+            G1 E2 F300
+            M400
+
+            ; Wipe
+
+            M106 P1 S178
+            M400 S3
+            G1 X-3.5 F18000
+            G1 X-13.5 F3000
+            G1 X-3.5 F18000
+            G1 X-13.5 F3000
+            G1 X-3.5 F18000
+            G1 X-13.5 F3000
+            G1 X-3.5 F18000
+            M400
 
             """.replace('\n', '\\n')
-        )
+        self.publish_gcode(code)
 
     @staticmethod
     def get_first_fila_from_gcode(zip_url: str, file_path: str) -> int:

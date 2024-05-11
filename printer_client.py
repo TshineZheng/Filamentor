@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, Callable
-
 from broken_detect import BrokenDetect
 
 
@@ -62,11 +61,13 @@ class PrinterClient(ABC):
         pass
 
     @abstractmethod
-    def change_filament(self, next_fila: int, change_temp: int = 255):
-        """主动调用换色
+    def change_filament(self, ams, next_fila: int, change_temp: int = 255):
+        """打印机退料
 
         Args:
-            next_fila (int): 下一个颜色通道序号
+            ams (AMSCore): ams控制，在打印机退料时，可能需要控制ams动作，比如说回抽，送料等等
+            next_fila (int): 下一个通道
+            change_temp (int, optional): 换色温度. Defaults to 255.
         """
         pass
 

@@ -1,7 +1,7 @@
 import threading
 import time
 from datetime import datetime
-from typing import List
+from typing import Callable, List
 
 import printer_client as printer
 from app_config import AppConfig
@@ -75,20 +75,20 @@ class AMSCore(TAGLOG):
     def get_max_broken_safe_time(self) -> int:
         return max([bd.safe_time() for bd in self.broken_detects])
 
-    def run_filament_change(self, next_filament: int):
-        if self.fila_changing:
-            return
-        self.fila_changing = True
-        self.thread = threading.Thread(
-            target=self.filament_change, args=(next_filament,))
-        self.thread.start()
-
     def fila_shake(self, channel:int, action: ChannelAction, shake_time=1):
         self.driver_control(channel, ChannelAction.PULL if action == ChannelAction.PUSH else ChannelAction.PUSH)
         time.sleep(shake_time)
         self.driver_control(channel, ChannelAction.PUSH if action == ChannelAction.PUSH else ChannelAction.PULL)
 
-    def filament_change(self, next_filament: int):
+    def run_filament_change(self, next_filament: int, before_done: Callable = None):
+        if self.fila_changing:
+            return
+        self.fila_changing = True
+        self.thread = threading.Thread(
+            target=self.filament_change, args=(next_filament,before_done,))
+        self.thread.start()
+
+    def filament_change(self, next_filament: int, before_done: Callable = None):
         # FIXME: 要增加通道不匹配的判断，比如接到换第4通道，结果我们只有3通道，可以呼叫用户确认，再继续
 
         self.change_count += 1
@@ -167,6 +167,8 @@ class AMSCore(TAGLOG):
         persist.update_printer_channel(self.use_printer, self.fila_cur)
         self.LOGI("料线到达，换色完成")
 
+        if before_done : before_done()
+
         self.printer_client.resume()
         self.LOGI("恢复打印")
 
@@ -189,9 +191,11 @@ class AMSCore(TAGLOG):
             task_name = data['subtask_name']
             first_filament = data['first_filament']
             self.LOGI(f"接到打印任务：{task_name}，第一个通道: {first_filament + 1}")
-            # if first_filament != self.fila_cur:
-            #     self.LOGI("打印的第一个通道不是AMS当前通道, 需要换色")
-            #     self.printer_client.change_filament(first_filament)
+            if first_filament != self.fila_cur:
+                self.LOGI("打印的第一个通道不是AMS当前通道, 需要换色")
+                # threading.Thread(
+                #     target=self.printer_client.change_filament, 
+                #     args=(self, first_filament, self.change_tem)).start()
 
     def start(self):
         #TODO: 判断打印机是否有料，如果有料则仅送料，否则需要送料并调用打印机加载材料

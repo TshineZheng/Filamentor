@@ -5,12 +5,15 @@ from ams_core import AMSCore
 from app_config import AppConfig
 
 import web.web_configuration as web
+import consts
 
 app_config = AppConfig.load()
 
 if __name__ == '__main__':
     logger.remove(0)
     logger.add(sys.stderr, level="INFO")
+
+    consts.setup()
 
     # 启动所有控制器
     for c in app_config.controller_list:

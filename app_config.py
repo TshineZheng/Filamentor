@@ -8,7 +8,7 @@ from impl.mqtt_broken_detect import MQTTBrokenDetect
 from impl.yba_ams_controller import YBAAMSController
 from mqtt_config import MQTTConfig
 from printer_client import PrinterClient
-
+import consts
 
 class ChannelRelation:
     def __init__(self, printer_id: str, controller_id: str, channel: int) -> None:
@@ -174,13 +174,13 @@ class AppConfig:
         }
     
     def save(self):
-        with open('filamentor_config.json', 'w') as f:
+        with open(f'{consts.STORAGE_PATH}filamentor_config.json', 'w') as f:
             json.dump(self.to_dict(), f)
     
     @classmethod
     def load(cls):
         try:
-            with open('filamentor_config.json', 'r') as f:
+            with open(f'{consts.STORAGE_PATH}filamentor_config.json', 'r') as f:
                 data = json.load(f)
                 return AppConfig.from_dict(data)
         except:

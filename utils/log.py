@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import Any
 from loguru import logger as LOG
-
+import consts
 
 def LOGI(msg, *args: Any, **kwargs: Any):
     LOG.info(msg, *args, **kwargs)
@@ -16,7 +16,7 @@ def LOGD(msg, *args: Any, **kwargs: Any):
     LOG.debug(msg, *args, **kwargs)
 
 LOG.add(
-    sink = './logs/filamentor.log',
+    sink = f'{consts.STORAGE_PATH}/logs/filamentor.log',
     enqueue=True,
     rotation='1 days',
     retention='1 weeks',

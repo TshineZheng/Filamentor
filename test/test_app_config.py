@@ -1,6 +1,4 @@
 import json
-import unittest
-
 from app_config import AppConfig, ChannelRelation, DetectRelation, IDBrokenDetect, IDController, IDPrinterClient
 from impl.bambu_client import BambuClient, BambuClientConfig
 from impl.mqtt_broken_detect import MQTTBrokenDetect

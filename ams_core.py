@@ -6,22 +6,22 @@ from typing import List
 import printer_client as printer
 from app_config import AppConfig
 from controller import ChannelAction, Controller
-from utils.log import LOGD, LOGI
+from utils.log import TAGLOG
+import utils.persist as persist
 
 LOAD_TIMEOUT = 30   # 装料超时，超时会尝试抖动耗材
 LOAD_WARNING = 120  # 装料失败警告时间
 UNLOAD_TIMEOUT = 30 # 退料超时，超时会尝试抖动耗材
 UNLOAD_WARNING = 120 # 退料失败警告时间
 
-class AMSCore(object):
+class AMSCore(TAGLOG):
     def __init__(
         self,
         app_config: AppConfig,
-        use_printer: str,
-        cur_channel: int,
+        use_printer: str
     ) -> None:
         self.use_printer = use_printer
-        self.fila_cur = cur_channel
+        self.fila_cur = persist.get_printer_channel(use_printer)
         self.fila_next = 0
         self.change_count = 0
         self.fila_changing = False
@@ -33,20 +33,23 @@ class AMSCore(object):
 
         if self.broken_detects is None or len(self.broken_detects) == 0:
             self.broken_detects = [self.printer_client.filament_broken_detect()]   # 如果没有自定义断线检测，使用打印默认的
-            LOGI(f'打印机{use_printer} 没有配置断料检测器，使用打印机自己的断料检测器')
+            self.LOGI('没有配置断料检测器，使用打印机自己的断料检测器')
 
         self.channels: List[tuple[Controller, int]] = []    # 控制器对象, 通道在控制器上的序号
         for c in app_config.get_printer_channel_settings(use_printer):
             self.channels.append([app_config.get_controller(c.controller_id), c.channel])
 
-        LOGD(f'打印机: {use_printer}, 通道数量: {len(self.channels)}, 断料检测器数量: {len(self.broken_detects)}, 换色温度: {self.change_tem}')
+        self.LOGI(f'通道数量: {len(self.channels)}, 断料检测器数量: {len(self.broken_detects)}, 换色温度: {self.change_tem}, 当前通道: {self.fila_cur+1}')
         # 打印所有通道
         for c,i in self.channels:
-            LOGD(f'通道: {c.type_name()} {i}')
+            self.LOGD(f'通道: {c.type_name()} {i}')
 
         # 打印所有断料检测器
         for bd in self.broken_detects:
-            LOGD(f'断料检测器: {bd.type_name()}')
+            self.LOGD(f'断料检测器: {bd.type_name()}')
+
+    def tag(self):
+        return self.use_printer
 
     def driver_control(self, printer_ch: int, action: ChannelAction):
         c,i = self.channels[printer_ch]
@@ -89,17 +92,17 @@ class AMSCore(object):
         # FIXME: 要增加通道不匹配的判断，比如接到换第4通道，结果我们只有3通道，可以呼叫用户确认，再继续
 
         self.change_count += 1
-        LOGI(f'第 {self.change_count} 次换色')
         self.fila_next = next_filament
-        LOGI(f'当前通道 {self.fila_cur + 1}，下个通道 {self.fila_next + 1}')
+
+        self.LOGI(f'第 {self.change_count} 次换色, 当前通道 {self.fila_cur + 1}，下个通道 {self.fila_next + 1}')
 
         if self.fila_cur == self.fila_next:
             self.printer_client.resume()
-            LOGI("通道相同，无需换色, 恢复打印")
+            self.LOGI("通道相同，无需换色, 恢复打印")
             self.fila_changing = False
             return
 
-        LOGI("等待退料完成")
+        self.LOGI(f"等待通道 {self.fila_cur + 1} 退料完成")
         self.driver_control(self.fila_cur, ChannelAction.PULL)   # 回抽当前通道
         self.printer_client.on_unload(self.change_tem)
 
@@ -112,26 +115,26 @@ class AMSCore(object):
             time.sleep(2)
 
             if fila_shaked == False and self.printer_client.get_filament_state() == printer.FilamentState.NO:
-                LOGI('打印机已经没有料了，抖一下吧，可以缓解五通卡头')
+                self.LOGI('打印机已经没有料了，抖一下吧，可以缓解五通卡头')
                 self.fila_shake(self.fila_cur, ChannelAction.PULL)
                 fila_shaked = True
                 ts = datetime.now().timestamp() # 重置抖一抖超时时间，避免这里抖完，超时那里又再抖一次
 
             if datetime.now().timestamp() - ts > UNLOAD_TIMEOUT:
-                LOGI("退料超时，抖一抖")
+                self.LOGI("退料超时，抖一抖")
                 self.fila_shake(self.fila_cur, ChannelAction.PULL)
                 fila_shaked = True
                 ts = datetime.now().timestamp()
 
             if max_pull_time < datetime.now().timestamp():
-                LOGI("退不出来，摇人吧（需要手动把料撤回）")
+                self.LOGI("退不出来，摇人吧（需要手动把料撤回）")
                 # TODO: 发出警报
 
-        LOGI("退料检测到位")
+        self.LOGI("退料检测到位")
         safe_time = self.get_max_broken_safe_time()
         if safe_time > 0:
             time.sleep(safe_time)   # 再退一点
-            LOGI("退料到安全距离")
+            self.LOGI("退料到安全距离")
 
         self.driver_control(self.fila_cur, ChannelAction.STOP)   # 停止抽回
 
@@ -141,7 +144,7 @@ class AMSCore(object):
         time.sleep(1)  # 休息下呗，万一板子反映不过来呢
 
         self.driver_control(self.fila_next, ChannelAction.PUSH)   # 输送下一个通道
-        LOGI("开始输送下一个通道")
+        self.LOGI(f"开始输送下一个通道 {self.fila_next + 1}")
 
         ts = datetime.now().timestamp()
         max_push_time = ts + LOAD_WARNING    # 最大送料时间，如果超出这个时间，则提醒用户
@@ -149,28 +152,30 @@ class AMSCore(object):
         # 到料目前还只能通过打印机判断，只能等了，不断刷新
         while self.printer_client.get_filament_state() != printer.FilamentState.YES:    # 等待打印机料线到达
             if datetime.now().timestamp() - ts > LOAD_TIMEOUT:
-                LOGI("送料超时，抖一抖")
+                self.LOGI("送料超时，抖一抖")
                 self.fila_shake(self.fila_next, ChannelAction.PUSH)
                 ts = datetime.now().timestamp()
 
             if max_push_time < datetime.now().timestamp():
-                LOGI("送不进去，摇人吧（需要手动把料送进去）")
+                self.LOGI("送不进去，摇人吧（需要手动把料送进去）")
                 # TODO: 发出警报
 
             self.printer_client.refresh_status()    # 刷新打印机状态
             time.sleep(2)
 
         self.fila_cur = self.fila_next
-        LOGI("料线到达，换色完成")
+        persist.update_printer_channel(self.use_printer, self.fila_cur)
+        self.LOGI("料线到达，换色完成")
+
         self.printer_client.resume()
-        LOGI("恢复打印")
+        self.LOGI("恢复打印")
 
         self.on_resumed()
 
         self.fila_changing = False
 
     def on_printer_action(self, action: printer.Action, data):
-        LOGD(f'收到打印机消息 {action} {data}')
+        self.LOGD(f'收到打印机 {self.use_printer} 消息 {action} {data}')
         if action == printer.Action.CHANGE_FILAMENT:
             self.run_filament_change(data)
 
@@ -181,7 +186,7 @@ class AMSCore(object):
             pass
 
         if action == printer.Action.PREPARE:
-            LOGI("开始打印")
+            self.LOGI("开始打印")
             self.change_count = 0 # 开始打印的时候把换色次数清零            
 
         if action == printer.Action.FINISH:
@@ -195,14 +200,14 @@ class AMSCore(object):
 
     def start(self):
         #TODO: 判断打印机是否有料，如果有料则仅送料，否则需要送料并调用打印机加载材料
-        #TODO 如果可以，最好能自主判断当前打印机的料是哪个通道
+        #TODO: 如果可以，最好能自主判断当前打印机的料是哪个通道
         
         # 如果通道是主动送料，则启动时，开始送料
         c,i = self.channels[self.fila_cur]
         if c.is_initiative_push(i):
             c.control(i, ChannelAction.PUSH)
 
-        LOGI(f'{self.use_printer} AMS 启动')
+        self.LOGI('AMS 启动')
 
     def stop(self):
         pass

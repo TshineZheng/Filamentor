@@ -32,14 +32,14 @@ class YBAAMSController(Controller):
         return cls(
             json_data["ip"],
             json_data["port"],
-            json_data["channel_count"]
+            json_data["channel_total"]
         )
 
     def to_dict(self) -> dict:
         return {
             'ip': self.ip,
             'port': self.port,
-            'channel_count': self.channel_count
+            'channel_total': self.channel_total
         }
     
     def start(self):
@@ -120,7 +120,7 @@ class YBAAMSController(Controller):
                     time.sleep(1)
 
     def control(self, channel_index: int, action: ChannelAction) -> bool:
-        if channel_index < 0 or channel_index >= self.channel_count:
+        if False == super().control(channel_index, action):
             return False
         
         if action == ChannelAction.PUSH:

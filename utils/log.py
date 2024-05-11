@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import Any
 from loguru import logger as LOG
 
@@ -24,3 +25,25 @@ LOG.add(
     diagnose=True,
     compression='zip'
 )
+
+class TAGLOG:
+    @abstractmethod
+    def tag(self):
+        return ''
+    
+    def LOGI(self, msg, *args: Any, **kwargs: Any):
+        LOGI(self.__mix_msg__(msg), *args, **kwargs)
+
+    def LOGW(self, msg, *args: Any, **kwargs: Any):
+        LOGW(self.__mix_msg__(msg), *args, **kwargs)
+
+    def LOGE(self, msg, *args: Any, **kwargs: Any):
+        LOGE(self.__mix_msg__(msg), *args, **kwargs)
+
+    def LOGD(self, msg, *args: Any, **kwargs: Any):
+        LOGD(self.__mix_msg__(msg), *args, **kwargs)
+
+    def __mix_msg__(self, msg:str):
+        if self.tag == '' or self.tag is None:
+            return msg
+        return f'{self.tag()} | {msg}'

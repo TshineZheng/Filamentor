@@ -6,8 +6,6 @@ from app_config import AppConfig
 
 import web.web_configuration as web
 
-CUR_CHANNEL = 2     # 当前通道
-
 app_config = AppConfig.load()
 
 if __name__ == '__main__':
@@ -27,7 +25,7 @@ if __name__ == '__main__':
     # 启动所有打印机 和 对应AMS 连接
     for p in app_config.printer_list:
         p.client.start()
-        ams = AMSCore(app_config, p.id, CUR_CHANNEL)
+        ams = AMSCore(app_config, p.id)
         ams.start()
         ams_list.append(ams)
 

@@ -288,7 +288,7 @@ class AppConfig:
     def is_channel_exist(self, controller_id: str, channel_id: int) -> bool:
         for p in self.controller_list:
             if p.id == controller_id:
-                if channel_id < p.controller.channel_count and channel_id >= 0:
+                if channel_id < p.controller.channel_total and channel_id >= 0:
                     return True
         return False
     

@@ -168,7 +168,7 @@ M109 S[new_filament_temp]
 M106 P1 S60
 
 ; FLUSH_START
-G1 E35 F{old_filament_e_feedrate}
+G1 E50 F{old_filament_e_feedrate}
 ; FLUSH_END
 
 G1 E-[new_retract_length_toolchange] F1800

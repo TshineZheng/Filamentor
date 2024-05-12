@@ -32,6 +32,7 @@ class AMSCore(TAGLOG):
         self.broken_detects = app_config.get_printer_broken_detect(use_printer)
         self.task_name = ''
         self.task_log_id = None
+        self.printer_fila_state = printer.FilamentState.UNKNOWN
 
         if self.broken_detects is None or len(self.broken_detects) == 0:
             self.broken_detects = [self.printer_client.filament_broken_detect()]   # 如果没有自定义断线检测，使用打印默认的
@@ -116,7 +117,7 @@ class AMSCore(TAGLOG):
         while not self.is_filament_broken():
             time.sleep(2)
 
-            if fila_shaked == False and self.printer_client.get_filament_state() == printer.FilamentState.NO:
+            if fila_shaked == False and self.printer_fila_state == printer.FilamentState.NO:
                 self.LOGI('打印机已经没有料了，抖一下吧，可以缓解五通卡头')
                 self.fila_shake(self.fila_cur, ChannelAction.PULL)
                 fila_shaked = True
@@ -152,7 +153,7 @@ class AMSCore(TAGLOG):
         max_push_time = ts + LOAD_WARNING    # 最大送料时间，如果超出这个时间，则提醒用户
 
         # 到料目前还只能通过打印机判断，只能等了，不断刷新
-        while self.printer_client.get_filament_state() != printer.FilamentState.YES:    # 等待打印机料线到达
+        while self.printer_fila_state != printer.FilamentState.YES:    # 等待打印机料线到达
             if datetime.now().timestamp() - ts > LOAD_TIMEOUT:
                 self.LOGI("送料超时，抖一抖")
                 self.fila_shake(self.fila_next, ChannelAction.PUSH)
@@ -184,7 +185,7 @@ class AMSCore(TAGLOG):
             self.run_filament_change(data)
 
         if action == printer.Action.FILAMENT_SWITCH:
-            pass
+            self.printer_fila_state = data
 
         if action == printer.Action.TASK_START:
             self.change_count = 0   # 重置换色次数
@@ -246,4 +247,5 @@ class AMSCore(TAGLOG):
         self.LOGI('AMS 启动')
 
     def stop(self):
+        self.printer_client.remove_on_action(self.on_printer_action)
         pass

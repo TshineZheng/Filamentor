@@ -19,35 +19,35 @@ class FilamentState(Enum):
 
 class PrinterClient(ABC):
     def __init__(self):
-        self.filament_state = FilamentState.UNKNOWN
         # action 回调列表
         self.action_callbacks: list[Callable[[Action, Any], None]] = []
 
     @staticmethod
     @abstractmethod
     def type_name() -> str:
+        """打印机类型
+
+        Returns:
+            str: 返回打印机的类型
+        """
         pass
-
-    def add_on_action(self, callback: Callable[[Action, Any], None]):
-        self.action_callbacks.append(callback)
-
-    def remove_on_action(self, callback: Callable[[Action, Any], None]):
-        self.action_callbacks.remove(callback)
-
-    def on_action(self, action: Action, data: Any = None):
-        for callback in self.action_callbacks:
-            callback(action, data)
 
     @abstractmethod
     def start(self):
+        """启动打印机连接
+        """
         pass
 
     @abstractmethod
     def stop(self):
+        """关闭打印机连接
+        """
         pass
 
     @abstractmethod
     def resume(self):
+        """打印机恢复打印，主要用于暂停换料后
+        """
         pass
 
     @abstractmethod
@@ -72,6 +72,8 @@ class PrinterClient(ABC):
 
     @abstractmethod
     def refresh_status(self):
+        """刷新打印机状态，通过 on action 回调数据
+        """
         pass
 
     @abstractmethod
@@ -85,12 +87,32 @@ class PrinterClient(ABC):
 
     @abstractmethod
     def to_dict(self) -> dict:
-        """保存配置
+        """输出打印机的相关配置
         """
         pass
 
-    def get_filament_state(self) -> FilamentState:
-        return self.filament_state
+    def add_on_action(self, callback: Callable[[Action, Any], None]):
+        """增加 on action 回调
 
-    def set_filament_state(self, state: FilamentState):
-        self.filament_state = state
+        Args:
+            callback (Callable[[Action, Any], None]): 回调函数
+        """
+        self.action_callbacks.append(callback)
+
+    def remove_on_action(self, callback: Callable[[Action, Any], None]):
+        """移除 on action 回调
+
+        Args:
+            callback (Callable[[Action, Any], None]): 回调函数
+        """
+        self.action_callbacks.remove(callback)
+
+    def on_action(self, action: Action, data: Any = None):
+        """回调派发, 打印机的信息派发给所有订阅的回调
+
+        Args:
+            action (Action): 动作
+            data (Any, optional): 动作数据. Defaults to None.
+        """
+        for callback in self.action_callbacks:
+            callback(action, data)

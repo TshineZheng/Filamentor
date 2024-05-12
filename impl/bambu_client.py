@@ -153,8 +153,7 @@ class BambuClient(PrinterClient, TAGLOG):
                     self.mc_command = mc_percent
 
             if "hw_switch_state" in json_print:
-                self.filament_state = FilamentState.YES if json_print["hw_switch_state"] == 1 else FilamentState.NO
-                self.on_action(Action.FILAMENT_SWITCH, self.filament_state)
+                self.on_action(Action.FILAMENT_SWITCH, FilamentState.YES if json_print["hw_switch_state"] == 1 else FilamentState.NO)
 
             if 'command' in json_print:
                 if json_print["command"] == 'project_file':
@@ -204,6 +203,9 @@ class BambuClient(PrinterClient, TAGLOG):
     def stop(self):
         super().stop()
         self.client.disconnect()
+        self.client.loop_stop()
+        if self.fbd is not None:
+            self.fbd.stop()
 
     def filament_broken_detect(self) -> BrokenDetect:
         if self.fbd is None:
@@ -328,21 +330,25 @@ class BambuBrokenDetect(BrokenDetect):
         return "bambu_broken_detect"
 
     def __init__(self, bambu_client: BambuClient):
-        super().__init__()
         self.bambu_client = bambu_client
-
-    def to_dict(self) -> dict:
-        return super().to_dict()
+        self.fila_state = FilamentState.UNKNOWN
 
     def is_filament_broken(self) -> bool:
         self.bambu_client.refresh_status()
-        return self.bambu_client.get_filament_state() == FilamentState.NO
+        return FilamentState.NO == self.fila_state
 
     def safe_time(self) -> float:
         return 2
 
+    def on_printer_action(self, action: Action, data):
+        if Action.FILAMENT_SWITCH == action:
+            self.fila_state = data
+
     def start(self):
-        return super().start()
+        self.bambu_client.add_on_action(self.on_printer_action)
 
     def stop(self):
-        return super().stop()
+        self.bambu_client.remove_on_action(self.on_printer_action)
+
+    def to_dict(self) -> dict:
+        pass

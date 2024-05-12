@@ -339,7 +339,7 @@ class BambuBrokenDetect(BrokenDetect):
         return self.bambu_client.get_filament_state() == FilamentState.NO
 
     def safe_time(self) -> float:
-        return 1.5
+        return 2
 
     def start(self):
         return super().start()

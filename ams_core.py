@@ -186,7 +186,7 @@ class AMSCore(TAGLOG):
         if action == printer.Action.FILAMENT_SWITCH:
             pass
 
-        if action == printer.Action.START:
+        if action == printer.Action.TASK_START:
             self.change_count = 0   # 重置换色次数
 
             self.task_name = data['subtask_name']
@@ -201,13 +201,13 @@ class AMSCore(TAGLOG):
                 #     target=self.printer_client.change_filament, 
                 #     args=(self, first_filament, self.change_tem)).start()
         
-        if action == printer.Action.FINISH:
+        if action == printer.Action.TASK_FINISH:
             if self.task_name is not None:
                 self.LOGI(f"{self.task_name} 打印完成")
                 self.task_name = None
                 self.stop_task_log()
             
-        if action == printer.Action.FAILED:
+        if action == printer.Action.TASK_FAILED:
             if self.task_name is not None:
                 self.LOGI(f"{self.task_name} 打印失败")
                 self.task_name = None

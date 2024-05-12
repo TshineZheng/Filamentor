@@ -163,7 +163,7 @@ class BambuClient(PrinterClient, TAGLOG):
                         url = json_data['print']['url']
                         subtask_name = json_data['print']['subtask_name']
                         ci = BambuClient.get_first_fila_from_gcode(url, p)
-                        self.on_action(Action.START, {
+                        self.on_action(Action.TASK_START, {
                             'first_filament': ci,
                             'subtask_name': subtask_name
                         })
@@ -174,10 +174,10 @@ class BambuClient(PrinterClient, TAGLOG):
                     self.wating_pause_flag = True
                 if 'FINISH' == gcode_state:
                     if self.mc_percent == 100:
-                        self.on_action(Action.FINISH)
+                        self.on_action(Action.TASK_FINISH)
                 if 'FAILED' == gcode_state:
                     if ast(json_print, 'print_error', 50348044):
-                        self.on_action(Action.FAILED)
+                        self.on_action(Action.TASK_FAILED)
                         
 
     def refresh_status(self):

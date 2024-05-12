@@ -6,12 +6,11 @@ from broken_detect import BrokenDetect
 
 class Action(Enum):
     CHANGE_FILAMENT = 0  # 更换通道
-    FILAMENT_SWITCH_0 = 1  # 卸载完成
-    FILAMENT_SWITCH_1 = 2  # 装载完成
-    START = 3  # 接到任务
-    PREPARE = 4  # 准备开始
-    FINISH = 5  # 打印完成
-    FAILED = 6  # 打印失败
+    FILAMENT_SWITCH = 1  # 打印机断料检测器状态改变
+    START = 2  # 接到任务
+    PREPARE = 3  # 准备开始
+    FINISH = 4  # 打印完成
+    FAILED = 5  # 打印失败
 
 class FilamentState(Enum):
     NO = 0  # 无料
@@ -35,7 +34,7 @@ class PrinterClient(ABC):
     def remove_on_action(self, callback: Callable[[Action, Any], None]):
         self.action_callbacks.remove(callback)
 
-    def on_action(self, action: Action, data: Any):
+    def on_action(self, action: Action, data: Any = None):
         for callback in self.action_callbacks:
             callback(action, data)
 

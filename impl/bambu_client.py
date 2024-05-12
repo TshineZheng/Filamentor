@@ -4,6 +4,7 @@ import time
 import paho.mqtt.client as mqtt
 
 from broken_detect import BrokenDetect
+from utils.json_util import ast
 from utils.log import LOGD, LOGE, LOGI, LOGW, TAGLOG
 from printer_client import Action, FilamentState, PrinterClient
 
@@ -133,11 +134,12 @@ class BambuClient(PrinterClient, TAGLOG):
             return
 
         if "print" in json_data:
-            if "mc_percent" in json_data["print"] and "mc_remaining_time" in json_data["print"]:
-                mc_percent = json_data["print"]["mc_percent"]
+            json_print = json_data["print"]
+            if "mc_percent" in json_print and "mc_remaining_time" in json_print:
+                mc_percent = json_print["mc_percent"]
                 if mc_percent == 101:  # 换色指令
-                    if "gcode_state" in json_data["print"] and json_data["print"]["gcode_state"] == "PAUSE":  # 暂停状态
-                        filament_next = json_data["print"]["mc_remaining_time"]  # 更换通道
+                    if ast(json_print, 'gcode_state', 'PAUSE'): # 暂停状态
+                        filament_next = json_print["mc_remaining_time"]  # 更换通道
                         self.on_action(Action.CHANGE_FILAMENT, filament_next)
                     else:
                         # 有一种情况是暂停了，但打印机不会发消息过来，所以要确保打印机是在暂停状态再执行
@@ -146,22 +148,17 @@ class BambuClient(PrinterClient, TAGLOG):
                         self.publish_status()
                 elif mc_percent >=0 and mc_percent <= 100:
                     self.mc_percent = mc_percent
-                    self.mc_remaining_time = json_data["print"]["mc_remaining_time"]
+                    self.mc_remaining_time = json_print["mc_remaining_time"]
                 else:
                     self.mc_command = mc_percent
 
-            if "hw_switch_state" in json_data["print"]:
-                if json_data["print"]["hw_switch_state"] == 0:
-                    self.filament_state = FilamentState.NO
-                    self.on_action(Action.FILAMENT_SWITCH_0, None)
-                    
-                if json_data["print"]["hw_switch_state"] == 1:
-                    self.filament_state = FilamentState.YES
-                    self.on_action(Action.FILAMENT_SWITCH_1, None)
+            if "hw_switch_state" in json_print:
+                self.filament_state = FilamentState.YES if json_print["hw_switch_state"] == 1 else FilamentState.NO
+                self.on_action(Action.FILAMENT_SWITCH, self.filament_state)
 
-            if 'command' in json_data["print"]:
-                if json_data["print"]["command"] == 'project_file':
-                    if 'param' in json_data["print"] and 'url' in json_data['print'] and 'subtask_name' in json_data['print']:
+            if 'command' in json_print:
+                if json_print["command"] == 'project_file':
+                    if 'param' in json_print and 'url' in json_data['print'] and 'subtask_name' in json_data['print']:
                         p = json_data['print']['param']
                         url = json_data['print']['url']
                         subtask_name = json_data['print']['subtask_name']
@@ -171,8 +168,17 @@ class BambuClient(PrinterClient, TAGLOG):
                             'subtask_name': subtask_name
                         })
 
-            if "gcode_state" in json_data["print"] and json_data["print"]["gcode_state"] == "PAUSE":
-                self.wating_pause_flag = True
+            if "gcode_state" in json_print:
+                gcode_state = json_print["gcode_state"]
+                if "PAUSE" == gcode_state:
+                    self.wating_pause_flag = True
+                if 'FINISH' == gcode_state:
+                    if self.mc_percent == 100:
+                        self.on_action(Action.FINISH)
+                if 'FAILED' == gcode_state:
+                    if ast(json_print, 'print_error', 50348044):
+                        self.on_action(Action.FAILED)
+                        
 
     def refresh_status(self):
         self.publish_status()

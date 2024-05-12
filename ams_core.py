@@ -30,6 +30,8 @@ class AMSCore(TAGLOG):
         self.change_tem = app_config.get_printer_change_tem(use_printer)
         self.printer_client.add_on_action(self.on_printer_action)
         self.broken_detects = app_config.get_printer_broken_detect(use_printer)
+        self.task_name = ''
+        self.task_log_id = None
 
         if self.broken_detects is None or len(self.broken_detects) == 0:
             self.broken_detects = [self.printer_client.filament_broken_detect()]   # 如果没有自定义断线检测，使用打印默认的
@@ -177,25 +179,60 @@ class AMSCore(TAGLOG):
         self.fila_changing = False
 
     def on_printer_action(self, action: printer.Action, data):
-        self.LOGD(f'收到打印机 {self.use_printer} 消息 {action} {data}')
+        self.LOGD(f'收到打印机 {self.use_printer} 消息 {action} {"" if data is None else data}')
         if action == printer.Action.CHANGE_FILAMENT:
             self.run_filament_change(data)
 
-        if action == printer.Action.FILAMENT_SWITCH_0:
-            pass
-
-        if action == printer.Action.FILAMENT_SWITCH_1:
+        if action == printer.Action.FILAMENT_SWITCH:
             pass
 
         if action == printer.Action.START:
-            task_name = data['subtask_name']
+            self.change_count = 0   # 重置换色次数
+
+            self.task_name = data['subtask_name']
             first_filament = data['first_filament']
-            self.LOGI(f"接到打印任务：{task_name}，第一个通道: {first_filament + 1}")
+
+            self.start_task_log()
+
+            self.LOGI(f"接到打印任务: {self.task_name}, 第一个通道: {first_filament + 1}")
             if first_filament != self.fila_cur:
                 self.LOGI("打印的第一个通道不是AMS当前通道, 需要换色")
                 # threading.Thread(
                 #     target=self.printer_client.change_filament, 
                 #     args=(self, first_filament, self.change_tem)).start()
+        
+        if action == printer.Action.FINISH:
+            if self.task_name is not None:
+                self.LOGI(f"{self.task_name} 打印完成")
+                self.task_name = None
+                self.stop_task_log()
+            
+        if action == printer.Action.FAILED:
+            if self.task_name is not None:
+                self.LOGI(f"{self.task_name} 打印失败")
+                self.task_name = None
+                self.stop_task_log()
+
+    def start_task_log(self):
+        from loguru import logger as LOG
+        import consts
+
+        self.task_log_id = LOG.add(
+            sink = f'{consts.STORAGE_PATH}/logs/task/{self.task_name}_{datetime.now().strftime("%Y%m%d-%H%M%S")}.log',
+            enqueue=True,
+            rotation='1 days',
+            retention='1 weeks',
+            encoding='utf-8',
+            backtrace=True,
+            diagnose=True,
+            compression='zip'
+        )
+    
+    def stop_task_log(self):
+        if self.task_log_id is not None:
+            from loguru import logger as LOG
+            LOG.remove(self.task_log_id)
+            self.task_log_id = None
 
     def start(self):
         #TODO: 判断打印机是否有料，如果有料则仅送料，否则需要送料并调用打印机加载材料

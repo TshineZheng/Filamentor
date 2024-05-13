@@ -200,7 +200,7 @@ class AMSCore(TAGLOG):
         self.start_task_log()   # 开始记录打印日志
 
         self.LOGI(f"接到打印任务: {self.task_name}, 第一个通道: {first_filament + 1}")
-
+        self.LOGE(f'开始通道{first_filament}不正常')
 
         # TODO: 如果打印机没有料，就不要送料了，且提示用户进那个料
 

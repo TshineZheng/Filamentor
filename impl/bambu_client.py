@@ -42,7 +42,7 @@ class BambuClient(PrinterClient, TAGLOG):
     def __init__(self, config: BambuClientConfig):
         super().__init__()
 
-        self.fbd = None
+        self.fbd = BambuBrokenDetect(self)
         self.config = config
 
         self.TOPIC_SUBSCRIBE = f"device/{config.device_serial}/report"
@@ -199,18 +199,15 @@ class BambuClient(PrinterClient, TAGLOG):
         self.client.connect(self.config.printer_ip, MQTT_PORT, 60)
         self.client.subscribe(self.TOPIC_SUBSCRIBE, qos=1)
         self.client.loop_start()
+        self.fbd.start()
 
     def stop(self):
         super().stop()
         self.client.disconnect()
         self.client.loop_stop()
-        if self.fbd is not None:
-            self.fbd.stop()
+        self.fbd.stop()
 
     def filament_broken_detect(self) -> BrokenDetect:
-        if self.fbd is None:
-            self.fbd = BambuBrokenDetect(self)
-
         return self.fbd
     
     def waiting_pause(self):

@@ -25,14 +25,14 @@ class AMSCore(TAGLOG):
         self.fila_next = 0
         self.change_count = 0
         self.fila_changing = False
-        self.app_config = app_config
-        self.printer_client = app_config.get_printer(use_printer)
-        self.change_tem = app_config.get_printer_change_tem(use_printer)
-        self.printer_client.add_on_action(self.on_printer_action)
-        self.broken_detects = app_config.get_printer_broken_detect(use_printer)
         self.task_name = ''
         self.task_log_id = None
         self.printer_fila_state = printer.FilamentState.UNKNOWN
+
+        self.app_config = app_config
+        self.printer_client = app_config.get_printer(use_printer)
+        self.change_tem = app_config.get_printer_change_tem(use_printer)
+        self.broken_detects = app_config.get_printer_broken_detect(use_printer)
 
         if self.broken_detects is None or len(self.broken_detects) == 0:
             self.broken_detects = [self.printer_client.filament_broken_detect()]   # 如果没有自定义断线检测，使用打印默认的
@@ -43,11 +43,8 @@ class AMSCore(TAGLOG):
             self.channels.append([app_config.get_controller(c.controller_id), c.channel])
 
         self.LOGI(f'通道数量: {len(self.channels)}, 断料检测器数量: {len(self.broken_detects)}, 换色温度: {self.change_tem}, 当前通道: {self.fila_cur+1}')
-        # 打印所有通道
         for c,i in self.channels:
             self.LOGD(f'通道: {c.type_name()} {i}')
-
-        # 打印所有断料检测器
         for bd in self.broken_detects:
             self.LOGD(f'断料检测器: {bd.type_name()}')
 
@@ -57,6 +54,7 @@ class AMSCore(TAGLOG):
     def driver_control(self, printer_ch: int, action: ChannelAction):
         c,i = self.channels[printer_ch]
         c.control(i, action)
+        self.LOGD(f'{action} {printer_ch} ({c.type_name()} {i})')
 
     def on_resumed(self):
         c,i = self.channels[self.fila_cur]
@@ -142,7 +140,7 @@ class AMSCore(TAGLOG):
         self.driver_control(self.fila_cur, ChannelAction.STOP)   # 停止抽回
 
         # 强行让打印机材料状态变成无，避免万一竹子消息延迟或什么的，不要完全相信别人的接口，如果可以自己判断的话（使用自定义断料检测器有效）
-        self.printer_client.set_filament_state(printer.FilamentState.NO)
+        self.printer_fila_state = printer.FilamentState.NO
 
         time.sleep(1)  # 休息下呗，万一板子反映不过来呢
 
@@ -188,31 +186,42 @@ class AMSCore(TAGLOG):
             self.printer_fila_state = data
 
         if action == printer.Action.TASK_START:
-            self.change_count = 0   # 重置换色次数
-
-            self.task_name = data['subtask_name']
-            first_filament = data['first_filament']
-
-            self.start_task_log()
-
-            self.LOGI(f"接到打印任务: {self.task_name}, 第一个通道: {first_filament + 1}")
-            if first_filament != self.fila_cur:
-                self.LOGI("打印的第一个通道不是AMS当前通道, 需要换色")
-                # threading.Thread(
-                #     target=self.printer_client.change_filament, 
-                #     args=(self, first_filament, self.change_tem)).start()
+            self.__on_task_started(data['subtask_name'], data['first_filament'])
         
         if action == printer.Action.TASK_FINISH:
-            if self.task_name is not None:
-                self.LOGI(f"{self.task_name} 打印完成")
-                self.task_name = None
-                self.stop_task_log()
+            self.__on_task_stopped(action)
             
         if action == printer.Action.TASK_FAILED:
-            if self.task_name is not None:
-                self.LOGI(f"{self.task_name} 打印失败")
-                self.task_name = None
-                self.stop_task_log()
+            self.__on_task_stopped(action)
+
+    def __on_task_started(self, task_name: str, first_filament: int):
+        self.task_name = task_name
+        self.change_count = 0   # 重置换色次数
+        self.start_task_log()   # 开始记录打印日志
+
+        self.LOGI(f"接到打印任务: {self.task_name}, 第一个通道: {first_filament + 1}")
+
+
+        # TODO: 如果打印机没有料，就不要送料了，且提示用户进那个料
+
+        # 如果通道是主动送料，则启动时，开始送料
+        c,i = self.channels[self.fila_cur]
+        if c.is_initiative_push(i):
+            self.driver_control(self.fila_cur, ChannelAction.PUSH)
+        
+        if first_filament != self.fila_cur:
+            self.LOGI("打印的第一个通道不是AMS当前通道, 需要换色")
+            # threading.Thread(
+            #     target=self.printer_client.change_filament, 
+            #     args=(self, first_filament, self.change_tem)).start()
+
+    def __on_task_stopped(self, action: printer.Action):
+        if self.task_name is not None:
+            self.LOGI(f"{self.task_name} {'打印完成' if action == printer.Action.TASK_FINISH else '打印失败'}")
+            self.task_name = None
+            self.stop_task_log()
+            c,i = self.channels[self.fila_cur]
+            c.control(i, ChannelAction.STOP)
 
     def start_task_log(self):
         from loguru import logger as LOG
@@ -238,14 +247,10 @@ class AMSCore(TAGLOG):
     def start(self):
         #TODO: 判断打印机是否有料，如果有料则仅送料，否则需要送料并调用打印机加载材料
         #TODO: 如果可以，最好能自主判断当前打印机的料是哪个通道
-        
-        # 如果通道是主动送料，则启动时，开始送料
-        c,i = self.channels[self.fila_cur]
-        if c.is_initiative_push(i):
-            c.control(i, ChannelAction.PUSH)
 
+        self.printer_client.add_on_action(self.on_printer_action)
+        self.printer_client.refresh_status()
         self.LOGI('AMS 启动')
 
     def stop(self):
         self.printer_client.remove_on_action(self.on_printer_action)
-        pass

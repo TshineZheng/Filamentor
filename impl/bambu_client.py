@@ -10,7 +10,7 @@ from printer_client import Action, FilamentState, PrinterClient
 
 # 定义服务器信息和认证信息
 MQTT_PORT = 8883
-BAMBU_CLIENT_ID = "open-ams"
+BAMBU_CLIENT_ID = "Filamentor-Bambu-Client"
 # noinspection SpellCheckingInspection
 USERNAME = "bblp"
 
@@ -173,7 +173,8 @@ class BambuClient(PrinterClient, TAGLOG):
                     self.wating_pause_flag = True
                 if 'FINISH' == gcode_state:
                     if self.mc_percent == 100:
-                        self.on_action(Action.TASK_FINISH)
+                        if 'subtask_name' in json_print:
+                            self.on_action(Action.TASK_FINISH, json_print['subtask_name'])
                 if 'FAILED' == gcode_state:
                     if ast(json_print, 'print_error', 50348044):
                         self.on_action(Action.TASK_FAILED)

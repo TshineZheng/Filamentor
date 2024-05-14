@@ -20,7 +20,6 @@ class YBAAMSController(Controller):
         self.port:str = port
         self.sock:socket.socket = None
         self.ch_state:List[int] = [0, 0, 0, 0]
-        self.running = False
         self.thread: threading.Thread = None
         self.lock = threading.Lock()
 
@@ -45,14 +44,12 @@ class YBAAMSController(Controller):
     def start(self):
         super().start()
         self.connect()
-        self.running = True
-        self.thread = threading.Thread(target=self.heartbeat)
+        self.thread = threading.Thread(target=self.heartbeat, name=f"yba-ams({self.ip}) heartbeat")
         self.thread.start()
     
     def stop(self):
         super().stop()
         self.disconnect()
-        self.running = False
         if self.thread:
             self.thread.join()
 
@@ -101,7 +98,7 @@ class YBAAMSController(Controller):
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect((server_ip, server_port))
-                LOGI("连接到YBA成功")
+                LOGI(f"连接到YBA ({server_ip})成功")
                 return sock
             except Exception as e:
                 LOGE(f"连接到YBA失败: {e}")
@@ -109,7 +106,7 @@ class YBAAMSController(Controller):
                 time.sleep(5)
 
     def heartbeat(self):
-        while self.running:
+        while self.is_running:
             if self.sock is None:
                 time.sleep(1)
             else:

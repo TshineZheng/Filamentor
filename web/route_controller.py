@@ -2,9 +2,9 @@ import uuid
 
 import microdot as dot
 
-from controller import Controller
+from controller import ChannelAction, Controller
 from impl.yba_ams_controller import YBAAMSController
-from main import app_config
+from app_config import config
 import web.web_configuration as web
 
 app = dot.Microdot()
@@ -21,15 +21,15 @@ def add(request: dot.Request):
     except Exception as e:
         return web.json_response(code = 500, msg= '创建控制器失败：' + str(e))
     
-    app_config.add_controller(f'{type}_{uuid.uuid1()}', controller)
-    app_config.save()
+    config.add_controller(f'{type}_{uuid.uuid1()}', controller)
+    config.save()
     return web.json_response()
 
 @app.route('/remove')
 def remove(request: dot.Request):
     id = request.json["id"]
-    app_config.remove_controller(id)
-    app_config.save()
+    config.remove_controller(id)
+    config.save()
     return web.json_response()
 
 @app.route('/bind_printer')
@@ -37,7 +37,7 @@ def bind_printer(request: dot.Request):
     channel = request.json["channel"]
     printer_id = request.json["printer_id"]
     controller_id = request.json["controller_id"]
-    app_config.add_channel_setting(printer_id, controller_id, channel)
+    config.add_channel_setting(printer_id, controller_id, channel)
     return web.json_response()
 
 @app.route('/unbind_printer')
@@ -45,5 +45,13 @@ def unbind_printer(request: dot.Request):
     channel = request.json["channel"]
     controller_id = request.json["controller_id"]
     printer_id = request.json["printer_id"]
-    app_config.remove_channel_setting(printer_id, controller_id, channel)
+    config.remove_channel_setting(printer_id, controller_id, channel)
+    return web.json_response()
+
+@app.route('/control')
+def controll(request: dot.Request):
+    channel = request.args.get("channel")
+    controller_id = request.args.get("controller_id")
+    action = request.args.get("action")
+    config.get_controller(controller_id).control(int(channel), ChannelAction(int(action)))
     return web.json_response()

@@ -9,6 +9,7 @@ from impl.yba_ams_controller import YBAAMSController
 from mqtt_config import MQTTConfig
 from printer_client import PrinterClient
 import consts
+from utils.log import LOGE
 
 class ChannelRelation:
     def __init__(self, printer_id: str, controller_id: str, channel: int) -> None:
@@ -136,32 +137,32 @@ class AMSSettings:
     def __init__(self, cur_filament: int, change_temp: int) -> None:
         pass
 
-class AppConfig:
+class AppConfig():
+    def __init__(self) -> None:
+        self.printer_list: List[IDPrinterClient] = []
+        self.controller_list: List[IDController] = []
+        self.detect_list: List[IDBrokenDetect] = []
+        self.channel_relations: List[ChannelRelation] = []
+        self.detect_relations: List[DetectRelation] = []
+        self.mqtt_config: MQTTConfig = MQTTConfig()
+        self.load_from_file()
 
-    def __init__(self,
-                 printers: List[IDPrinterClient],
-                 controllers: List[IDController],
-                 detects: List[IDBrokenDetect],
-                 channel_rel: List[ChannelRelation],
-                 detect_rel: List[DetectRelation],
-                 mqtt_config: MQTTConfig
-                 ) -> None:
-        self.printer_list = printers
-        self.controller_list = controllers
-        self.detect_list = detects
-        self.channel_relations = channel_rel
-        self.detect_relations = detect_rel
-        self.mqtt_config = mqtt_config
-
-    @classmethod
-    def from_dict(cls, data: dict):
-        printers = [IDPrinterClient.from_dict(i) for i in data["printer_list"]]
-        controllers = [IDController.from_dict(i) for i in data["controller_list"]]
-        detects = [IDBrokenDetect.from_dict(i) for i in data["detect_list"]]
-        channel_rel = [ChannelRelation.from_dict(i) for i in data["channel_relations"]]
-        detect_rel = [DetectRelation.from_dict(i) for i in data["detect_relations"]]
-        mqtt_config = MQTTConfig.from_dict(data["mqtt_config"])
-        return cls(printers, controllers, detects, channel_rel, detect_rel, mqtt_config)
+    def load_from_dict(self, data: dict):
+        self.printer_list = [IDPrinterClient.from_dict(i) for i in data["printer_list"]]
+        self.controller_list = [IDController.from_dict(i) for i in data["controller_list"]]
+        self.detect_list = [IDBrokenDetect.from_dict(i) for i in data["detect_list"]]
+        self.channel_relations = [ChannelRelation.from_dict(i) for i in data["channel_relations"]]
+        self.detect_relations = [DetectRelation.from_dict(i) for i in data["detect_relations"]]
+        self.mqtt_config = MQTTConfig.from_dict(data["mqtt_config"])
+    
+    def load_from_file(self):
+        try:
+            with open(f'{consts.STORAGE_PATH}filamentor_config.json', 'r') as f:
+                data = json.load(f)
+                self.load_from_dict(data)
+        except:
+            LOGE("读取配置文件失败")
+            pass
 
     def to_dict(self):
         return {
@@ -176,15 +177,6 @@ class AppConfig:
     def save(self):
         with open(f'{consts.STORAGE_PATH}filamentor_config.json', 'w') as f:
             json.dump(self.to_dict(), f, ensure_ascii=False, indent=4)
-    
-    @classmethod
-    def load(cls):
-        try:
-            with open(f'{consts.STORAGE_PATH}filamentor_config.json', 'r') as f:
-                data = json.load(f)
-                return AppConfig.from_dict(data)
-        except:
-            return cls([], [], [], [], [],MQTTConfig())
     
     def add_printer(self, id: str, client: PrinterClient) -> bool:
         # 确保id不重复
@@ -337,6 +329,6 @@ class AppConfig:
         return None
         
 
-
+config = AppConfig()
 
 

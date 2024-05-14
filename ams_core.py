@@ -4,10 +4,10 @@ from datetime import datetime
 from typing import Callable, List
 
 import printer_client as printer
-from app_config import AppConfig
 from controller import ChannelAction, Controller
 from utils.log import TAGLOG
 import utils.persist as persist
+from app_config import config
 
 LOAD_TIMEOUT = 30   # 装料超时，超时会尝试抖动耗材
 LOAD_WARNING = 120  # 装料失败警告时间
@@ -17,7 +17,6 @@ UNLOAD_WARNING = 120 # 退料失败警告时间
 class AMSCore(TAGLOG):
     def __init__(
         self,
-        app_config: AppConfig,
         use_printer: str
     ) -> None:
         self.use_printer = use_printer
@@ -25,22 +24,21 @@ class AMSCore(TAGLOG):
         self.fila_next = 0
         self.change_count = 0
         self.fila_changing = False
-        self.task_name = ''
+        self.task_name = None
         self.task_log_id = None
         self.printer_fila_state = printer.FilamentState.UNKNOWN
 
-        self.app_config = app_config
-        self.printer_client = app_config.get_printer(use_printer)
-        self.change_tem = app_config.get_printer_change_tem(use_printer)
-        self.broken_detects = app_config.get_printer_broken_detect(use_printer)
+        self.printer_client = config.get_printer(use_printer)
+        self.change_tem = config.get_printer_change_tem(use_printer)
+        self.broken_detects = config.get_printer_broken_detect(use_printer)
 
         if self.broken_detects is None or len(self.broken_detects) == 0:
             self.broken_detects = [self.printer_client.filament_broken_detect()]   # 如果没有自定义断线检测，使用打印默认的
             self.LOGI('没有配置断料检测器，使用打印机自己的断料检测器')
 
         self.channels: List[tuple[Controller, int]] = []    # 控制器对象, 通道在控制器上的序号
-        for c in app_config.get_printer_channel_settings(use_printer):
-            self.channels.append([app_config.get_controller(c.controller_id), c.channel])
+        for c in config.get_printer_channel_settings(use_printer):
+            self.channels.append([config.get_controller(c.controller_id), c.channel])
 
         self.LOGI(f'通道数量: {len(self.channels)}, 断料检测器数量: {len(self.broken_detects)}, 换色温度: {self.change_tem}, 当前通道: {self.fila_cur+1}')
         for c,i in self.channels:
@@ -189,10 +187,10 @@ class AMSCore(TAGLOG):
             self.__on_task_started(data['subtask_name'], data['first_filament'])
         
         if action == printer.Action.TASK_FINISH:
-            self.__on_task_stopped(action)
+            self.__on_task_stopped(data, action)
             
         if action == printer.Action.TASK_FAILED:
-            self.__on_task_stopped(action)
+            self.__on_task_stopped(data, action)
 
     def __on_task_started(self, task_name: str, first_filament: int):
         self.task_name = task_name
@@ -200,7 +198,8 @@ class AMSCore(TAGLOG):
         self.start_task_log()   # 开始记录打印日志
 
         self.LOGI(f"接到打印任务: {self.task_name}, 第一个通道: {first_filament + 1}")
-        self.LOGE(f'开始通道{first_filament}不正常')
+        if first_filament < 0 or first_filament >= len(self.channels):
+            self.LOGE(f'开始通道{first_filament}不正常')
 
         # TODO: 如果打印机没有料，就不要送料了，且提示用户进那个料
 
@@ -215,8 +214,8 @@ class AMSCore(TAGLOG):
             #     target=self.printer_client.change_filament, 
             #     args=(self, first_filament, self.change_tem)).start()
 
-    def __on_task_stopped(self, action: printer.Action):
-        if self.task_name is not None:
+    def __on_task_stopped(self, task_name: str, action: printer.Action):
+        if self.task_name == task_name:
             self.LOGI(f"{self.task_name} {'打印完成' if action == printer.Action.TASK_FINISH else '打印失败'}")
             self.task_name = None
             self.stop_task_log()

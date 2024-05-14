@@ -1,0 +1,2 @@
+GET http://localhost:717/api/config/get_config
+Content-Type: application/json

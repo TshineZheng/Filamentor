@@ -3,7 +3,7 @@ import uuid
 import microdot as dot
 
 from impl.bambu_client import BambuClient
-from main import app_config
+from app_config import config
 from printer_client import PrinterClient
 import web.web_configuration as web
 
@@ -20,8 +20,8 @@ def add(request: dot.Request):
       else:
           return web.json_response(code = 400, msg= '不支持的打印机类型：' + type)  # 不支持的打印机类型
       
-      app_config.add_printer(f'{type}_{uuid.uuid1()}', client)
-      app_config.save()
+      config.add_printer(f'{type}_{uuid.uuid1()}', client)
+      config.save()
 
       return web.json_response()
     except Exception as e:
@@ -32,8 +32,8 @@ def add(request: dot.Request):
 @app.route('/remove')
 def remove(request: dot.Request):
     id = request.json["id"]
-    app_config.remove_printer(id)
-    app_config.save()
+    config.remove_printer(id)
+    config.save()
 
     return web.json_response()
     

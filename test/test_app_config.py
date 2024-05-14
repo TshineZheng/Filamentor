@@ -6,22 +6,24 @@ from impl.yba_ams_controller import YBAAMSController
 from mqtt_config import MQTTConfig
 
 def make_config() -> AppConfig:
-        printer_list = [
+        config = AppConfig()
+
+        config.printer_list = [
             IDPrinterClient('bambu_1', BambuClient(BambuClientConfig("127.0.0.1", 'lan_pwd', "device_serial"))),
             IDPrinterClient('bambu_2', BambuClient(BambuClientConfig("127.0.0.2", 'lan_pwd', "device_serial"))),
         ]
 
-        controller_list = [
+        config.controller_list = [
             IDController('yba_ams_1', YBAAMSController('192.168.10.1', 1883, 4)),
             IDController('yba_ams_2', YBAAMSController('192.168.10.2', 1883, 3)),
         ]
 
-        detect_list = [
+        config.detect_list = [
             IDBrokenDetect('mqtt_detect_1', MQTTBrokenDetect(MQTTConfig('192.168.10.2', 1833, 'client_id', 'username', 'password'))),
             IDBrokenDetect('mqtt_detect_2', MQTTBrokenDetect(MQTTConfig('192.168.10.2', 1833, 'client_id', 'username', 'password'))),
         ]
 
-        channel_settings = [
+        config.channel_relations = [
             ChannelRelation('bambu_1', 'yba_ams_1', 0),
             ChannelRelation('bambu_1', 'yba_ams_1', 1),
             ChannelRelation('bambu_1', 'yba_ams_1', 2),
@@ -31,14 +33,14 @@ def make_config() -> AppConfig:
             ChannelRelation('bambu_2', 'yba_ams_2', 2),
         ]
 
-        detect_settings = [
+        config.detect_relations = [
             DetectRelation('bambu_1', 'mqtt_detect_1'),
             DetectRelation('bambu_2', 'mqtt_detect_2'),
         ]
 
-        mqtt = MQTTConfig('192.168.10.1', 1833, 'client_id', 'username', 'password')
+        config.mqtt_config = MQTTConfig('192.168.10.1', 1833, 'client_id', 'username', 'password')
 
-        return AppConfig(printer_list, controller_list, detect_list, channel_settings, detect_settings, mqtt)
+        return config
 
 
 def test_app_config_json():
@@ -46,10 +48,9 @@ def test_app_config_json():
 
         json_data = json.dumps(config.to_dict(), indent=4)
 
-        config2 = AppConfig.from_dict(json.loads(json_data))
+        config.load_from_dict(json.loads(json_data))
 
-        # 判断两个对象对数据是否相等
-        assert config.to_dict() == config2.to_dict()
+        assert config.to_dict() == json.loads(json_data)
 
 def test_add_printer():
     config = make_config()

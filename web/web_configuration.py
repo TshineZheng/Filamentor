@@ -1,7 +1,7 @@
 import json
 import microdot as dot
 
-def json_response(data=None, code=200, msg="OK", error:Exception=None):
+def json_response(data=None, code=0, msg="OK", error:Exception=None):
     """返回JSON格式的响应，包含固定的code和msg字段"""
     response_data = {
         'code': code,
@@ -14,7 +14,7 @@ def json_response(data=None, code=200, msg="OK", error:Exception=None):
     if error is not None:
         response_data['error'] = str(error)
 
-    return dot.Response(json.dumps(response_data), code, headers={'Content-Type': 'application/json'})
+    return dot.Response(json.dumps(response_data), 200, headers={'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
 
 def error_response(error: Exception, msg='error'):
     return json_response(error=error, msg= msg)
@@ -32,7 +32,7 @@ def run():
     app.mount(detect.app, '/api/detect')
     app.mount(config.app, '/api/config')
     
-    app.run(port=717)
+    app.run(port=717, host='0.0.0.0')
 
 def stop():
     app.shutdown()

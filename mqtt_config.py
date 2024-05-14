@@ -1,5 +1,5 @@
 class MQTTConfig:
-    def __init__(self, server: str = None, port: int = 1883, client_id: str = 'Filamentor', username: str = '', password: str = ''):
+    def __init__(self, server: str = None, port: int = 1883, client_id: str = 'Filamentor-MQTT', username: str = '', password: str = ''):
         self.server = server
         self.port = port
         self.client_id = client_id

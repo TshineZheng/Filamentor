@@ -132,52 +132,57 @@ class BambuClient(PrinterClient, TAGLOG):
         except json.JSONDecodeError:
             LOGE("JSON解析失败")
             return
+        
+        if 'print' not in json_data:
+            return
 
-        if "print" in json_data:
-            json_print = json_data["print"]
-            if "mc_percent" in json_print and "mc_remaining_time" in json_print:
-                mc_percent = json_print["mc_percent"]
-                if mc_percent == 101:  # 换色指令
-                    if ast(json_print, 'gcode_state', 'PAUSE'): # 暂停状态
-                        filament_next = json_print["mc_remaining_time"]  # 更换通道
-                        self.on_action(Action.CHANGE_FILAMENT, filament_next)
-                    else:
-                        # 有一种情况是暂停了，但打印机不会发消息过来，所以要确保打印机是在暂停状态再执行
-                        # FIXME: 还有一种情况是已经恢复打印，但进度没有更新，导致一直触发换色指令，也就会一直尝试获取打印状态，直到下次换色，或进度更新，可能需要通过gcode修复(bambu)
-                        LOGW('收到换色指令，但打印机不是暂停状态，重新刷新状态')
-                        self.publish_status()
-                elif mc_percent >=0 and mc_percent <= 100:
-                    self.mc_percent = mc_percent
-                    self.mc_remaining_time = json_print["mc_remaining_time"]
+        json_print = json_data["print"]
+        if 'mc_percent' in json_print:
+            mc_percent = json_print["mc_percent"]
+
+            if 101 == mc_percent:  # 换色指令
+                if 'mc_remaining_time' not in json_print:
+                    LOGW('收到换色指令，但没有换色通道？，重新刷新状态')
+                    self.publish_status()
+                elif not ast(json_print, 'gcode_state', 'PAUSE'): # 暂停状态
+                    LOGW('收到换色指令，但打印机不是暂停状态，重新刷新状态')
+                    self.publish_status()
                 else:
-                    self.mc_command = mc_percent
+                    filament_next = json_print["mc_remaining_time"]  # 更换通道
+                    self.on_action(Action.CHANGE_FILAMENT, filament_next)
 
-            if "hw_switch_state" in json_print:
-                self.on_action(Action.FILAMENT_SWITCH, FilamentState.YES if json_print["hw_switch_state"] == 1 else FilamentState.NO)
+            elif mc_percent >=0 and mc_percent <= 100 and 'mc_remaining_time' in json_print:
+                self.mc_percent = mc_percent
+                self.mc_remaining_time = json_print["mc_remaining_time"]
+            else:
+                self.mc_command = mc_percent
 
-            if 'command' in json_print:
-                if json_print["command"] == 'project_file':
-                    if 'param' in json_print and 'url' in json_data['print'] and 'subtask_name' in json_data['print']:
-                        p = json_data['print']['param']
-                        url = json_data['print']['url']
-                        subtask_name = json_data['print']['subtask_name']
-                        ci = BambuClient.get_first_fila_from_gcode(url, p)
-                        self.on_action(Action.TASK_START, {
-                            'first_filament': ci,
-                            'subtask_name': subtask_name
-                        })
+        if "hw_switch_state" in json_print:
+            self.on_action(Action.FILAMENT_SWITCH, FilamentState.YES if json_print["hw_switch_state"] == 1 else FilamentState.NO)
 
-            if "gcode_state" in json_print:
-                gcode_state = json_print["gcode_state"]
-                if "PAUSE" == gcode_state:
-                    self.wating_pause_flag = True
-                if 'FINISH' == gcode_state:
-                    if self.mc_percent == 100:
-                        if 'subtask_name' in json_print:
-                            self.on_action(Action.TASK_FINISH, json_print['subtask_name'])
-                if 'FAILED' == gcode_state:
-                    if ast(json_print, 'print_error', 50348044):
-                        self.on_action(Action.TASK_FAILED)
+        if 'command' in json_print:
+            if json_print["command"] == 'project_file':
+                if 'param' in json_print and 'url' in json_data['print'] and 'subtask_name' in json_data['print']:
+                    p = json_data['print']['param']
+                    url = json_data['print']['url']
+                    subtask_name = json_data['print']['subtask_name']
+                    ci = BambuClient.get_first_fila_from_gcode(url, p)
+                    self.on_action(Action.TASK_START, {
+                        'first_filament': ci,
+                        'subtask_name': subtask_name
+                    })
+
+        if "gcode_state" in json_print:
+            gcode_state = json_print["gcode_state"]
+            if "PAUSE" == gcode_state:
+                self.wating_pause_flag = True
+            if 'FINISH' == gcode_state:
+                if self.mc_percent == 100:
+                    if 'subtask_name' in json_print:
+                        self.on_action(Action.TASK_FINISH, json_print['subtask_name'])
+            if 'FAILED' == gcode_state:
+                if ast(json_print, 'print_error', 50348044):
+                    self.on_action(Action.TASK_FAILED)
                         
 
     def refresh_status(self):

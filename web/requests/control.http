@@ -1,8 +1,4 @@
 GET http://localhost:717/api/controller/control
-Content-Type: application/json
-
-{
-    "controller_id":"yba-ams-1",
-    "channel": 0,
-    "action": 0
-}
+    ?channel=1
+    &controller_id=yba-ams-1
+    &action=1

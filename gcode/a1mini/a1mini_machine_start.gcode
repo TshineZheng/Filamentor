@@ -1,6 +1,6 @@
 ;===== machine: Bambu A1 mini ============
-;===== date: 2024511 =====================
-; ===== Filamentor V0.1 ==================
+;===== date: 2024520 =====================
+; ===== Filamentor V0.2 ==================
 
 ;===== start to heat heatbead&hotend==========
 M1002 gcode_claim_action : 2
@@ -8,6 +8,7 @@ M1002 set_filament_type:{filament_type[initial_no_support_extruder]}
 M104 S170
 M140 S[bed_temperature_initial_layer_single]
 G392 S0 ;turn off clog detect
+M9833.2
 ;=====start printer sound ===================
 M17
 M400 S1
@@ -34,12 +35,11 @@ M18
 ;=====avoid end stop =================
 G91
 G380 S2 Z30 F1200
-G380 S2 Z-20 F1200
+G380 S3 Z-20 F1200
 G1 Z5 F1200
 G90
 
 ;===== reset machine status =================
-M290 X39 Y39 Z8
 M204 S6000
 
 M630 S0 P0
@@ -308,7 +308,7 @@ G1 X10 Y10 F20000
 M1002 judge_flag g29_before_print_flag
 M622 J1
     M1002 gcode_claim_action : 1
-    G29 A X{first_layer_print_min[0]} Y{first_layer_print_min[1]} I{first_layer_print_size[0]} J{first_layer_print_size[1]}
+    G29 A1 X{first_layer_print_min[0]} Y{first_layer_print_min[1]} I{first_layer_print_size[0]} J{first_layer_print_size[1]}
     M400
     M500 ; save cali data
 M623
@@ -326,7 +326,7 @@ M623
 ;===== home after wipe mouth end =======================
 
 M975 S1 ; turn on vibration supression
-;===== noozle load line ===============================
+;===== nozzle load line ===============================
 M975 S1
 G90
 M83
@@ -358,7 +358,7 @@ M622 J1
     G90
     M83
     G0 X68 Y-4 F30000
-    G0 Z0.2 F18000 ;Move to start position
+    G0 Z0.3 F18000 ;Move to start position
     M400
     G0 X88 E10  F{outer_wall_volumetric_speed/(24/20)    * 60}
     G0 X93 E.3742  F{outer_wall_volumetric_speed/(0.3*0.5)/4     * 60}
@@ -439,6 +439,6 @@ T1000
 
 M211 X0 Y0 Z0 ;turn off soft endstop
 M1007 S1
-;===============================================================
-;Hello this is start end
-;===============================================================
+
+
+

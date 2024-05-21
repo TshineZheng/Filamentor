@@ -32,7 +32,7 @@ def run():
     app.mount(detect.app, '/api/detect')
     app.mount(config.app, '/api/config')
     
-    app.run(port=717, host='0.0.0.0')
+    app.run(port=1717, host='0.0.0.0')
 
 def stop():
     app.shutdown()

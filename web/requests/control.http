@@ -1,4 +1,18 @@
 GET http://localhost:717/api/controller/control
     ?channel=1
-    &controller_id=yba-ams-1
+    &controller_id=yba-ams-py-1
     &action=1
+
+###
+GET http://localhost:717/api/controller/get_log
+    ?controller_id=yba-ams-py-1
+
+
+###
+GET http://192.168.10.233:1717/api/controller/get_log?controller_id=yba-ams-py-1
+
+###
+GET http://192.168.10.233:1717/api/controller/control
+    ?channel=1
+    &controller_id=yba-ams-py-1
+    &action=0

@@ -1,6 +1,7 @@
-from abc import ABC, abstractmethod
+from abc import  abstractmethod
 from enum import Enum
 
+from base_unit import BaseUnit
 from utils.log import LOGE
 
 
@@ -12,7 +13,7 @@ class ChannelAction(Enum):
     STOP = 0  # 停（也可以是松）
 
 
-class Controller(ABC):
+class Controller(BaseUnit):
     """料架控制器
     """
 
@@ -28,19 +29,19 @@ class Controller(ABC):
             channel_total (int): 通道数量
         """
         self.channel_total = channel_total
-        self.is_running = False
+        super().__init__()
 
     @abstractmethod
     def start(self):
         """启动控制器
         """
-        self.is_running = True
+        super().start()
 
     @abstractmethod
     def stop(self):
         """停止控制器
         """
-        self.is_running = False
+        super().stop()
 
     @abstractmethod
     def control(self, channel_index: int, action: ChannelAction) -> bool:

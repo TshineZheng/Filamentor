@@ -112,6 +112,8 @@ class YBAAMSController(Controller):
             else:
                 for t in range(5):
                     for i in range(4):
+                        if not self.is_running:
+                            break
                         self.ams_control(i, self.ch_state[i]) # 心跳+同步状态 先这样写，后面再改
                         time.sleep(0.3)
                     time.sleep(1)

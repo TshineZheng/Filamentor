@@ -1,6 +1,7 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from enum import Enum
 from typing import Any, Callable
+from base_unit import BaseUnit
 from broken_detect import BrokenDetect
 
 
@@ -17,8 +18,9 @@ class FilamentState(Enum):
     YES = 1  # 有料
     UNKNOWN = 2  # 未知
 
-class PrinterClient(ABC):
+class PrinterClient(BaseUnit):
     def __init__(self):
+        super().__init__()
         # action 回调列表
         self.action_callbacks: list[Callable[[Action, Any], None]] = []
 
@@ -36,13 +38,13 @@ class PrinterClient(ABC):
     def start(self):
         """启动打印机连接
         """
-        pass
+        super().start()
 
     @abstractmethod
     def stop(self):
         """关闭打印机连接
         """
-        pass
+        super().stop()
 
     @abstractmethod
     def resume(self):

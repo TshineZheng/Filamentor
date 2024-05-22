@@ -1,9 +1,11 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
+
+from base_unit import BaseUnit
 
 
-class BrokenDetect(ABC):
+class BrokenDetect(BaseUnit):
     def __init__(self):
-        pass
+        super().__init__()
 
     @staticmethod
     @abstractmethod
@@ -18,11 +20,11 @@ class BrokenDetect(ABC):
 
     @abstractmethod
     def start(self):
-        pass
+        super().start()
 
     @abstractmethod
     def stop(self):
-        pass
+        super().stop()
 
     @abstractmethod
     def is_filament_broken(self) -> bool:

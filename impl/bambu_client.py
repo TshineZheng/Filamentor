@@ -111,6 +111,9 @@ class BambuClient(PrinterClient, TAGLOG):
 
     # noinspection PyUnusedLocal
     def on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
+        if not self.is_running:
+            return
+        
         LOGE("连接已断开，请检查打印机状态，以及是否有其它应用占用了打印机")
         self.reconnect(client)
 

@@ -19,6 +19,7 @@ class MQTTBrokenDetect(BrokenDetect):
         return 'mqtt_broken_detect'
 
     def __init__(self, mqtt_config: MQTTConfig):
+        super().__init__()
         self.mqtt_config = mqtt_config
         self.topic = TOPIC
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=mqtt_config.client_id)
@@ -38,6 +39,7 @@ class MQTTBrokenDetect(BrokenDetect):
         }
 
     def start(self):
+        super().start()
         # 连接到MQTT服务器
         self.client.connect(self.mqtt_config.server, self.mqtt_config.port, 60)
 
@@ -48,6 +50,7 @@ class MQTTBrokenDetect(BrokenDetect):
         self.client.loop_start()
 
     def stop(self):
+        super().stop()
         self.client.disconnect()
 
     def on_connect(self, client, userdata, flags, rc, properties):
@@ -57,7 +60,9 @@ class MQTTBrokenDetect(BrokenDetect):
         else:
             LOGE(f"连接MQTT失败，错误代码 {rc}")
 
-    def on_disconnect(self, client, userdata, rc, properties):
+    def on_disconnect(self, client, userdata, disconnect_flags, rc, properties):
+        if not self.is_running:
+            return
         LOGE("MQTT连接已断开，正在尝试重新连接")
         self.reconnect(client)
 

@@ -18,22 +18,14 @@ class YBAAMSPYController(YBAAMSController):
     
     def connect(self):
         super().connect()
-        
-        self.send_ams(b'\x2f\x2f\xff\xfe\xff')
-        data = self.get_str_result_from_ams()
-
-        LOGI(f'ESP32 {data}')
+        LOGI(f'ESP32 {self.ams_gc()}')
 
     def ams_gc(self) -> str:
         self.send_ams( b'\x2f\x2f\xff\xfe\xff')
         return self.get_str_result_from_ams()
-
-    def get_log(self) -> str:
-        self.send_ams(b'\x2f\x2f\xff\xfe\xfe')
-        return self.get_str_result_from_ams()
         
     def get_system_info(self) -> str:
-        self.send_ams(b'\x2f\x2f\xff\xfe\xfd')
+        self.send_ams(b'\x2f\x2f\xff\xfe\xfe')
         return self.get_str_result_from_ams()
     
     def get_str_result_from_ams(self)-> str:

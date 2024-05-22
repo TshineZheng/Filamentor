@@ -56,14 +56,3 @@ def controll(request: dot.Request):
     action = request.args.get("action")
     config.get_controller(controller_id).control(int(channel), ChannelAction(int(action)))
     return web.json_response()
-
-@app.route('/get_log')
-def get_ams_log(request: dot.Request):
-    controller_id = request.args.get("controller_id")
-
-    c = config.get_controller(controller_id)
-    if c.type_name() == YBAAMSPYController.type_name():
-        s = c.get_log()
-        return dot.Response(s, 200, headers={'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*'})
-        
-    return web.json_response()

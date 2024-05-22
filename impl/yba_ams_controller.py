@@ -55,7 +55,8 @@ class YBAAMSController(Controller):
 
     def connect(self):
         self.disconnect()
-        self.sock = self.connect_to_server(self.ip, self.port)
+        if self.is_running:
+            self.sock = self.connect_to_server(self.ip, self.port)
         
     def disconnect(self):
         if self.sock:

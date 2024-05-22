@@ -24,7 +24,7 @@ class YBAAMSPYController(YBAAMSController):
         self.send_ams( b'\x2f\x2f\xff\xfe\xff')
         return self.get_str_result_from_ams()
         
-    def get_system_info(self) -> str:
+    def get_system_status(self) -> str:
         self.send_ams(b'\x2f\x2f\xff\xfe\xfe')
         return self.get_str_result_from_ams()
     

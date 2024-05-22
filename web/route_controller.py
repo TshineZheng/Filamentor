@@ -56,3 +56,14 @@ def controll(request: dot.Request):
     action = request.args.get("action")
     config.get_controller(controller_id).control(int(channel), ChannelAction(int(action)))
     return web.json_response()
+
+@app.route('/get_system_status')
+def get_status(request: dot.Request):
+    controller_id = request.args.get("controller_id")
+
+    c = config.get_controller(controller_id)
+
+    if c.type_name() == YBAAMSPYController.type_name():
+        return web.json_response({'status': c.get_system_info()})
+
+    return web.json_response(msg='unsupported controller type')

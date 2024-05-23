@@ -4,3 +4,4 @@ logs/filamentor.log
 filamentor_config.json
 test/test_private.py
 data/*
+web/client_requests/*

@@ -74,7 +74,9 @@ class YBAAMSController(Controller):
 
         while True:
             try:
+                self.sock.settimeout(2)
                 self.sock.sendall(data)
+                self.sock.settimeout(None)
                 return
             except Exception as e:
                 LOGE(f"向YBA发送指令失败: {e}")
@@ -103,8 +105,8 @@ class YBAAMSController(Controller):
                 return sock
             except Exception as e:
                 LOGE(f"连接到YBA失败: {e}")
-                LOGE("5秒后尝试重新连接...")
-                time.sleep(5)
+                LOGE("2秒后尝试重新连接...")
+                time.sleep(2)
 
     def heartbeat(self):
         while self.is_running:

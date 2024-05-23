@@ -64,6 +64,6 @@ def get_status(request: dot.Request):
     c = config.get_controller(controller_id)
 
     if c.type_name() == YBAAMSPYController.type_name():
-        return web.json_response({'status': c.get_system_info()})
+        return web.json_response({'status': c.get_system_status()})
 
     return web.json_response(msg='unsupported controller type')

@@ -1,6 +1,8 @@
+import time
 from impl.yba_ams_controller import YBAAMSController
 from utils.log import LOGI
 
+ams_sync = b'\x2f\x2f\xff\xfe\x02\x04'
 
 class YBAAMSPYController(YBAAMSController):
     """YBA-AMS-Python 版本，用 python 复刻原版，增加内存指令
@@ -45,3 +47,12 @@ class YBAAMSPYController(YBAAMSController):
             return data
 
         return ''
+    
+    def ams_sync(self):
+        self.send_ams(ams_sync + bytes([self.ch_state[0],self.ch_state[1],self.ch_state[2],self.ch_state[3]]))
+
+    def heartbeat(self):
+        while self.is_running:
+            if self.sock is not None:
+                self.ams_sync()
+            time.sleep(1)

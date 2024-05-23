@@ -5,6 +5,7 @@ import microdot as dot
 from impl.bambu_client import BambuClient
 from app_config import config
 from printer_client import PrinterClient
+from utils import persist
 import web.web_configuration as web
 
 app = dot.Microdot()
@@ -36,9 +37,14 @@ def remove(request: dot.Request):
     config.save()
 
     return web.json_response()
-    
 
-        
+@app.route('/set_channel')
+def set_channel(request: dot.Request):
+    id = request.args["printer_id"]
+    channel = request.args["channel"]
+    persist.update_printer_channel(id, channel)
+
+    return web.json_response()
         
   
 

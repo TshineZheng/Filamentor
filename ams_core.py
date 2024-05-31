@@ -14,6 +14,8 @@ LOAD_WARNING = 120  # 装料失败警告时间
 UNLOAD_TIMEOUT = 30 # 退料超时，超时会尝试抖动耗材
 UNLOAD_WARNING = 120 # 退料失败警告时间
 
+PRINTER_UNLOAD_TIMEOUT = 5
+
 class AMSCore(TAGLOG):
     def __init__(
         self,
@@ -78,102 +80,6 @@ class AMSCore(TAGLOG):
         self.driver_control(channel, ChannelAction.PULL if action == ChannelAction.PUSH else ChannelAction.PUSH)
         time.sleep(shake_time)
         self.driver_control(channel, ChannelAction.PUSH if action == ChannelAction.PUSH else ChannelAction.PULL)
-
-    def run_filament_change(self, next_filament: int, before_done: Callable = None):
-        if self.fila_changing:
-            return
-        self.fila_changing = True
-        self.thread = threading.Thread(
-            target=self.filament_change, args=(next_filament,before_done,))
-        self.thread.start()
-
-    def filament_change(self, next_filament: int, before_done: Callable = None):
-        # FIXME: 要增加通道不匹配的判断，比如接到换第4通道，结果我们只有3通道，可以呼叫用户确认，再继续
-
-        self.change_count += 1
-        self.fila_next = next_filament
-
-        self.LOGI(f'第 {self.change_count} 次换色, 当前通道 {self.fila_cur + 1}，下个通道 {self.fila_next + 1}')
-
-        if self.fila_cur == self.fila_next:
-            self.printer_client.resume()
-            self.LOGI("通道相同，无需换色, 恢复打印")
-            self.fila_changing = False
-            return
-
-        self.LOGI(f"等待通道 {self.fila_cur + 1} 退料完成")
-        self.driver_control(self.fila_cur, ChannelAction.PULL)   # 回抽当前通道
-        self.printer_client.on_unload(self.change_tem)
-
-        ts = datetime.now().timestamp()
-        max_pull_time = ts + UNLOAD_WARNING    # 最大退料时间，如果超出这个时间，则提醒用户
-        fila_shaked = False  # 是否抖过料：当打印机断料检测器没有料时，会主动抖一下，如果抖过了就不再抖了，除非退料超时
-
-        # 等待所有断料检测器都没有料
-        while not self.is_filament_broken():
-            time.sleep(2)
-
-            if fila_shaked == False and self.printer_fila_state == printer.FilamentState.NO:
-                self.LOGI('打印机已经没有料了，抖一下吧，可以缓解五通卡头')
-                self.fila_shake(self.fila_cur, ChannelAction.PULL)
-                fila_shaked = True
-                ts = datetime.now().timestamp() # 重置抖一抖超时时间，避免这里抖完，超时那里又再抖一次
-
-            if datetime.now().timestamp() - ts > UNLOAD_TIMEOUT:
-                self.LOGI("退料超时，抖一抖")
-                self.fila_shake(self.fila_cur, ChannelAction.PULL)
-                fila_shaked = True
-                ts = datetime.now().timestamp()
-
-            if max_pull_time < datetime.now().timestamp():
-                self.LOGI("退不出来，摇人吧（需要手动把料撤回）")
-                # TODO: 发出警报
-
-        self.LOGI("退料检测到位")
-        safe_time = self.get_max_broken_safe_time()
-        if safe_time > 0:
-            time.sleep(safe_time)   # 再退一点
-            self.LOGI("退料到安全距离")
-
-        self.driver_control(self.fila_cur, ChannelAction.STOP)   # 停止抽回
-
-        # 强行让打印机材料状态变成无，避免万一竹子消息延迟或什么的，不要完全相信别人的接口，如果可以自己判断的话（使用自定义断料检测器有效）
-        self.printer_fila_state = printer.FilamentState.NO
-
-        time.sleep(1)  # 休息下呗，万一板子反映不过来呢
-
-        self.driver_control(self.fila_next, ChannelAction.PUSH)   # 输送下一个通道
-        self.LOGI(f"开始输送下一个通道 {self.fila_next + 1}")
-
-        ts = datetime.now().timestamp()
-        max_push_time = ts + LOAD_WARNING    # 最大送料时间，如果超出这个时间，则提醒用户
-
-        # 到料目前还只能通过打印机判断，只能等了，不断刷新
-        while self.printer_fila_state != printer.FilamentState.YES:    # 等待打印机料线到达
-            if datetime.now().timestamp() - ts > LOAD_TIMEOUT:
-                self.LOGI("送料超时，抖一抖")
-                self.fila_shake(self.fila_next, ChannelAction.PUSH)
-                ts = datetime.now().timestamp()
-
-            if max_push_time < datetime.now().timestamp():
-                self.LOGI("送不进去，摇人吧（需要手动把料送进去）")
-                # TODO: 发出警报
-
-            self.printer_client.refresh_status()    # 刷新打印机状态
-            time.sleep(2)
-
-        self.fila_cur = self.fila_next
-        persist.update_printer_channel(self.use_printer, self.fila_cur)
-        self.LOGI("料线到达，换色完成")
-
-        if before_done : before_done()
-
-        self.printer_client.resume()
-        self.LOGI("恢复打印")
-
-        self.on_resumed()
-
-        self.fila_changing = False
 
     def on_printer_action(self, action: printer.Action, data):
         self.LOGD(f'收到打印机 {self.use_printer} 消息 {action} {"" if data is None else data}')
@@ -253,3 +159,103 @@ class AMSCore(TAGLOG):
 
     def stop(self):
         self.printer_client.remove_on_action(self.on_printer_action)
+
+    def run_filament_change(self, next_filament: int, before_done: Callable = None):
+        if self.fila_changing:
+            return
+        self.fila_changing = True
+        self.thread = threading.Thread(
+            target=self.filament_change, args=(next_filament,before_done,))
+        self.thread.start()
+        
+    def filament_change(self, next_filament: int, before_done: Callable = None):
+        # FIXME: 要增加通道不匹配的判断，比如接到换第4通道，结果我们只有3通道，可以呼叫用户确认，再继续
+
+        self.change_count += 1
+        self.fila_next = next_filament
+
+        self.LOGI(f'第 {self.change_count} 次换色, 当前通道 {self.fila_cur + 1}，下个通道 {self.fila_next + 1}')
+
+        if self.fila_cur == self.fila_next:
+            self.printer_client.resume()
+            self.LOGI("通道相同，无需换色, 恢复打印")
+            self.fila_changing = False
+            return
+        
+        self.driver_control(self.fila_cur, ChannelAction.STOP)   # 停止当前通道
+
+        self.LOGI(f"等待通道 {self.fila_cur + 1} 退料完成")
+        self.printer_client.on_unload(self.change_tem)
+
+        self.LOGI(f'通道 {self.fila_cur} 开始回抽')
+        self.driver_control(self.fila_cur, ChannelAction.PULL)   # 回抽当前通道
+
+        # 等待打印机小绿点消失，如果超过一定时间，估计是卡五通了
+        ts = datetime.now().timestamp()
+        while self.printer_fila_state != printer.FilamentState.YES: 
+            if datetime.now().timestamp() - ts > PRINTER_UNLOAD_TIMEOUT:
+                self.LOGI(f"打印机退料卡头了？都{PRINTER_UNLOAD_TIMEOUT}秒了，小绿点还没消失，抖一下")
+                self.fila_shake(self.fila_next, ChannelAction.PULL)
+                ts = datetime.now().timestamp()
+
+        self.LOGI("打印机退料完成")
+
+        ts = datetime.now().timestamp()
+        max_pull_time = ts + UNLOAD_WARNING    # 最大退料时间，如果超出这个时间，则提醒用户
+        # 等待所有断料检测器都没有料
+        while not self.is_filament_broken():
+            time.sleep(2)
+            if datetime.now().timestamp() - ts > UNLOAD_TIMEOUT:
+                self.LOGI("退料超时，抖一抖")
+                self.fila_shake(self.fila_cur, ChannelAction.PULL) 
+                ts = datetime.now().timestamp()
+
+            if max_pull_time < datetime.now().timestamp():
+                self.LOGI("退不出来，摇人吧（需要手动把料撤回）")
+                # TODO: 发出警报
+
+        self.LOGI("退料检测到位")
+        safe_time = self.get_max_broken_safe_time()
+        if safe_time > 0:
+            time.sleep(safe_time)   # 再退一点
+            self.LOGI("退料到安全距离")
+
+        self.driver_control(self.fila_cur, ChannelAction.STOP)   # 停止抽回
+
+        # 强行让打印机材料状态变成无，避免万一竹子消息延迟或什么的，不要完全相信别人的接口，如果可以自己判断的话（使用自定义断料检测器有效）
+        self.printer_fila_state = printer.FilamentState.NO
+
+        time.sleep(1)  # 休息下呗，万一板子反映不过来呢
+
+        self.driver_control(self.fila_next, ChannelAction.PUSH)   # 输送下一个通道
+        self.LOGI(f"开始输送下一个通道 {self.fila_next + 1}")
+
+        ts = datetime.now().timestamp()
+        max_push_time = ts + LOAD_WARNING    # 最大送料时间，如果超出这个时间，则提醒用户
+
+        # 到料目前还只能通过打印机判断，只能等了，不断刷新
+        while self.printer_fila_state != printer.FilamentState.YES:    # 等待打印机料线到达
+            if datetime.now().timestamp() - ts > LOAD_TIMEOUT:
+                self.LOGI("送料超时，抖一抖")
+                self.fila_shake(self.fila_next, ChannelAction.PUSH)
+                ts = datetime.now().timestamp()
+
+            if max_push_time < datetime.now().timestamp():
+                self.LOGI("送不进去，摇人吧（需要手动把料送进去）")
+                # TODO: 发出警报
+
+            self.printer_client.refresh_status()    # 刷新打印机状态
+            time.sleep(2)
+
+        self.fila_cur = self.fila_next
+        persist.update_printer_channel(self.use_printer, self.fila_cur)
+        self.LOGI("料线到达，换色完成")
+
+        if before_done : before_done()
+
+        self.printer_client.resume()
+        self.LOGI("恢复打印")
+
+        self.on_resumed()
+
+        self.fila_changing = False

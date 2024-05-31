@@ -7,6 +7,7 @@ from impl.bambu_client import BambuClient
 from impl.mqtt_broken_detect import MQTTBrokenDetect
 from impl.yba_ams_controller import YBAAMSController
 from impl.yba_ams_py_controller import YBAAMSPYController
+from impl.yba_ams_servo_controller import YBAAMSServoController
 from mqtt_config import MQTTConfig
 from printer_client import PrinterClient
 import consts
@@ -112,6 +113,8 @@ class IDController:
             controller = YBAAMSController.from_dict(data["info"])
         elif type == YBAAMSPYController.type_name():
             controller = YBAAMSPYController.from_dict(data["info"])
+        elif type == YBAAMSServoController.type_name():
+            controller = YBAAMSServoController.from_dict(data["info"])
         return cls(id, controller)
 
 

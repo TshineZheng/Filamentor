@@ -101,10 +101,10 @@ class YBAAMSController(Controller):
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect((server_ip, server_port))
-                LOGI(f"连接到YBA ({server_ip})成功")
+                LOGI(f"连接到 YBA-AMS ({server_ip})成功")
                 return sock
             except Exception as e:
-                LOGE(f"连接到YBA失败: {e}")
+                LOGE(f"连接到 YBA-AMS 失败: {e}")
                 LOGE("2秒后尝试重新连接...")
                 time.sleep(2)
 

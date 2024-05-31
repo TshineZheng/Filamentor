@@ -1,7 +1,6 @@
 
 
 if __name__ == '__main__':
-    import time
     from loguru import logger
     import sys
 

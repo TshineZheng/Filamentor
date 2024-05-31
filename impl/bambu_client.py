@@ -22,6 +22,10 @@ bambu_done = '{"print":{"command":"ams_control","param":"done","sequence_id":"1"
 bambu_clear = '{"print":{"command": "clean_print_error","sequence_id":"1"},"user_id":"1"}'
 bambu_status = '{"pushing": {"sequence_id": "0", "command": "pushall"}}'
 
+MAGIC_CHANNEL = 1000
+MAGIC_COMMAND = 2000
+MAGIC_AWAIT = MAGIC_COMMAND
+
 class BambuClientConfig(object):
 
     def __init__(self, printer_ip: str, lan_password: str, device_serial: str) -> None:
@@ -66,7 +70,8 @@ class BambuClient(PrinterClient, TAGLOG):
         self.wating_pause_flag = False
         self.mc_percent = 0
         self.mc_remaining_time = 0
-        self.mc_command = 0
+        self.magic_command = 0
+        self.cur_layer = 0
 
     @classmethod
     def from_dict(cls, config: dict):
@@ -127,38 +132,48 @@ class BambuClient(PrinterClient, TAGLOG):
                 LOGE(f"重连竹子失败 {delay} 秒后重试...")
                 time.sleep(delay)  # 等待一段时间后再次尝试
 
-    def on_message(self, client, userdata, message):
+    def on_message(self, client, userdata, message: mqtt.MQTTMessage):
         try:
             payload = str(message.payload.decode('utf-8'))
+            self.process_message(payload)
+        except Exception as e:
+            LOGE(f"mqtt数据解析失败: {e}")
+            return
+
+    def process_message(self, payload):
+        try:
             json_data = json.loads(payload)
             LOGD(f'bambu_mqtt_msg -> {payload}')
-        except json.JSONDecodeError:
-            LOGE("JSON解析失败")
+        except Exception as e:
+            LOGE(f"JSON解析失败: {e}")
             return
         
         if 'print' not in json_data:
             return
 
         json_print = json_data["print"]
-        if 'mc_percent' in json_print:
-            mc_percent = json_print["mc_percent"]
 
-            if 101 == mc_percent:  # 换色指令
-                if 'mc_remaining_time' not in json_print:
-                    LOGW('收到换色指令，但没有换色通道？，重新刷新状态')
-                    self.publish_status()
-                elif not ast(json_print, 'gcode_state', 'PAUSE'): # 暂停状态
-                    LOGW('收到换色指令，但打印机不是暂停状态，重新刷新状态')
-                    self.publish_status()
+        if 'layer_num' in json_print:
+            layer_num = json_print["layer_num"]
+            if not ast(json_print, 'print_type', 'idle'):   # 非空闲状态
+                if layer_num >= MAGIC_COMMAND:
+                    self.magic_command = layer_num
                 else:
-                    filament_next = json_print["mc_remaining_time"]  # 更换通道
-                    self.on_action(Action.CHANGE_FILAMENT, filament_next)
+                    self.magic_command = 0
+                    if layer_num >= MAGIC_CHANNEL:
+                        if not ast(json_print, 'gcode_state', 'PAUSE'): # 暂停状态
+                            LOGW('收到换色指令，但打印机不是暂停状态，重新刷新状态')
+                            self.publish_status()
+                        else:
+                            self.on_action(Action.CHANGE_FILAMENT, layer_num - MAGIC_CHANNEL)
+                    else:
+                        self.cur_layer = layer_num
 
-            elif mc_percent >=0 and mc_percent <= 100 and 'mc_remaining_time' in json_print:
-                self.mc_percent = mc_percent
-                self.mc_remaining_time = json_print["mc_remaining_time"]
-            else:
-                self.mc_command = mc_percent
+        if 'mc_percent' in json_print:
+            self.mc_percent = json_print["mc_percent"]
+
+        if 'mc_remaining_time' in json_print:
+            self.mc_remaining_time = json_print["mc_remaining_time"]
 
         if "hw_switch_state" in json_print:
             self.on_action(Action.FILAMENT_SWITCH, FilamentState.YES if json_print["hw_switch_state"] == 1 else FilamentState.NO)
@@ -177,31 +192,39 @@ class BambuClient(PrinterClient, TAGLOG):
 
         if "gcode_state" in json_print:
             gcode_state = json_print["gcode_state"]
-            if "PAUSE" == gcode_state:
+            if 'PAUSE' == gcode_state:
                 self.wating_pause_flag = True
             if 'FINISH' == gcode_state:
-                if self.mc_percent == 100:
-                    if 'subtask_name' in json_print:
-                        self.on_action(Action.TASK_FINISH, json_print['subtask_name'])
+                if self.mc_percent == 100 and 'subtask_name' in json_print:
+                    self.on_action(Action.TASK_FINISH, json_print['subtask_name'])
             if 'FAILED' == gcode_state:
                 if ast(json_print, 'print_error', 50348044):
                     self.on_action(Action.TASK_FAILED)
-                        
+
 
     def refresh_status(self):
         self.publish_status()
 
     def on_unload(self, pre_tem=255):
         super().on_unload(pre_tem)
-        self.publish_gcode("G1 E-25 F500\nM109 S" + str(pre_tem) + "\n")  # 抽回一段距离，提前升温
-        # 这B代码，好像是少加个 \n，搞的换完色，打印机就缓慢回抽，导致疯狂飞头。
-        # 也可能是没加 str()，不想试了，头很松了
+
+        # 抽回一段距离，提前升温
+        self.publish_gcode(
+            f"""
+            G1 E-28 F500
+            M400
+            M73 L{MAGIC_AWAIT}
+            M109 S{pre_tem}
+            """.replace('\n', '\\n')
+        )
+
+        self.waiting_magic_command(MAGIC_AWAIT) # 等待上面的gcode执行完成
 
     def resume(self):
         super().resume()
         self.publish_resume()
         self.publish_clear()
-        self.publish_gcode(f"M73 P{self.mc_percent} R{self.mc_remaining_time}\n")
+        self.publish_status()
 
     def start(self):
         super().start()
@@ -222,11 +245,14 @@ class BambuClient(PrinterClient, TAGLOG):
     def waiting_pause(self):
         self.waiing_199_flag = False
         while not self.wating_pause_flag:
+            self.publish_status()
             time.sleep(1)
 
-    def waiting_mc_command(self, mc: int):
-        while not self.mc_command == mc:
+    def waiting_magic_command(self, magic_code: int):
+        while not self.magic_command == magic_code:
+            self.publish_status()
             time.sleep(1)
+        self.LOGD(f'magic command {magic_code} received')
     
     def change_filament(self, ams, next_fila: int, change_temp: int = 255):
         # time.sleep(10)
@@ -257,10 +283,10 @@ class BambuClient(PrinterClient, TAGLOG):
 
             M400
 
-            M73 P198 R0
+            M73 M73 L{MAGIC_AWAIT}
         """.replace('\n', '\\n')
         self.publish_gcode(cut_code)
-        self.waiting_mc_command(198)
+        self.waiting_magic_command(MAGIC_AWAIT)
 
         self.LOGI('切料完成')
 
@@ -281,10 +307,10 @@ class BambuClient(PrinterClient, TAGLOG):
 
             M400
 
-            M73 P199 R0
+            M73 M73 L{MAGIC_AWAIT+1}
         """.replace('\n', '\\n')
         self.publish_gcode(wipe_code)
-        self.waiting_mc_command(199)
+        self.waiting_magic_command(MAGIC_AWAIT+1)
         self.LOGI('冲刷完成')
 
     @staticmethod

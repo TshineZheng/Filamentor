@@ -22,7 +22,7 @@ class MQTTBrokenDetect(BrokenDetect):
         super().__init__()
         self.mqtt_config = mqtt_config
         self.topic = TOPIC
-        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=mqtt_config.client_id)
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f'{mqtt_config.client_id}_{time.time()}')
         self.client.username_pw_set(mqtt_config.username, mqtt_config.password)
         self.client.on_connect = self.on_connect
         self.client.on_disconnect = self.on_disconnect

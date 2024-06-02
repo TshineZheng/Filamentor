@@ -1,5 +1,6 @@
 from abc import  abstractmethod
 from enum import Enum
+from typing import List
 
 from base_unit import BaseUnit
 from utils.log import LOGE
@@ -69,5 +70,14 @@ class Controller(BaseUnit):
 
         Returns:
             bool: 是否主动送料
+        """
+        pass
+
+    @abstractmethod
+    def get_channel_states(self)->List[int]:
+        """获取通道状态
+
+        Returns:
+            List[int]: 通道状态
         """
         pass

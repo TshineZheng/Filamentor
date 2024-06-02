@@ -323,6 +323,13 @@ class AppConfig():
                 return p.change_temp
         return 255
     
+    def set_printer_change_tem(self, printer_id: str, tem: int):
+        for p in self.printer_list:
+            if p.id == printer_id:
+                p.change_temp = tem
+                self.save()
+                return
+    
     def get_printer_broken_detect(self, printer_id: str) -> List[BrokenDetect]:
         t = [p for p in self.detect_relations if p.printer_id == printer_id]
         return [p.detect for p in self.detect_list if p.id in [d.detect_id for d in t]]

@@ -23,6 +23,9 @@ class YBAAMSController(Controller):
         self.thread: threading.Thread = None
         self.lock = threading.Lock()
 
+    def get_channel_states(self) -> List[int]:
+        return self.ch_state
+
     def __str__(self):
         return self.type_name()
 

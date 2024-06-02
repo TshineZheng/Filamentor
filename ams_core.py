@@ -167,6 +167,10 @@ class AMSCore(TAGLOG):
         self.thread = threading.Thread(
             target=self.filament_change, args=(next_filament,before_done,))
         self.thread.start()
+
+    def update_cur_fila(self, fila:int):
+        self.fila_cur = fila
+        persist.update_printer_channel(self.use_printer, self.fila_cur)
         
     def filament_change(self, next_filament: int, before_done: Callable = None):
         # FIXME: 要增加通道不匹配的判断，比如接到换第4通道，结果我们只有3通道，可以呼叫用户确认，再继续
@@ -247,8 +251,7 @@ class AMSCore(TAGLOG):
             self.printer_client.refresh_status()    # 刷新打印机状态
             time.sleep(2)
 
-        self.fila_cur = self.fila_next
-        persist.update_printer_channel(self.use_printer, self.fila_cur)
+        self.update_cur_fila(self.fila_next)
         self.LOGI("料线到达，换色完成")
 
         if before_done : before_done()
@@ -259,3 +262,5 @@ class AMSCore(TAGLOG):
         self.on_resumed()
 
         self.fila_changing = False
+
+ams_list:list[AMSCore] = []

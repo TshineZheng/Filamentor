@@ -4,7 +4,7 @@ if __name__ == '__main__':
     from loguru import logger
     import sys
 
-    from ams_core import AMSCore
+    from ams_core import AMSCore, ams_list
     import web.web_configuration as web
     import consts
     from app_config import config
@@ -21,8 +21,6 @@ if __name__ == '__main__':
     # 启动所有断料检测
     for d in config.detect_list:
         d.detect.start()
-
-    ams_list:list[AMSCore] = []
 
     # 启动所有打印机 和 对应AMS 连接
     for p in config.printer_list:

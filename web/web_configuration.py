@@ -22,7 +22,7 @@ def error_response(error: Exception, msg='error'):
 app = dot.Microdot()
 
 def run():
-    import web.route_config as config
+    import web.route_sys as sys
     import web.route_controller as controller
     import web.route_detect as detect
     import web.route_printer as printer
@@ -30,7 +30,7 @@ def run():
     app.mount(printer.app, '/api/printer')
     app.mount(controller.app, '/api/controller')
     app.mount(detect.app, '/api/detect')
-    app.mount(config.app, '/api/config')
+    app.mount(sys.app, '/api/sys')
     
     app.run(port=7170, host='0.0.0.0')
 

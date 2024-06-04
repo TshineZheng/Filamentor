@@ -1,3 +1,4 @@
+from urllib.parse import unquote
 import uuid
 
 import microdot as dot
@@ -12,6 +13,7 @@ app = dot.Microdot()
 @app.route('/add')
 def add(request: dot.Request):
     type = request.json["type"]
+    alias = unquote(request.json["alias"])
     bd:BrokenDetect = None
     try:
         if type == MQTTBrokenDetect.type_name():
@@ -21,7 +23,7 @@ def add(request: dot.Request):
     except Exception as e:
         return web.json_response(code = 500, msg= '创建断料检测器失败：' + str(e))
     
-    config.add_detect(f'{type}_{uuid.uuid1()}', bd)
+    config.add_detect(f'{type}_{uuid.uuid1()}', bd, alias)
     config.save()
 
     return web.json_response()

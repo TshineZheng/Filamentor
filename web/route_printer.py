@@ -1,3 +1,4 @@
+from urllib.parse import unquote
 import uuid
 
 import microdot as dot
@@ -7,22 +8,25 @@ from app_config import config
 from printer_client import PrinterClient
 from utils import persist
 import web.web_configuration as web
-
+import main
 app = dot.Microdot()
 
 @app.route('/add')
 def add(request: dot.Request):
     # 解析网络请求，通过请求中的type字段，判断是什么类型的打印机，并生成相应的打印机对象
     type = request.json["type"]
+    alias = unquote(request.json["alias"])
     client:PrinterClient = None
     try:
       if type == BambuClient.type_name():
-          client = BambuClient.from_dict(request.args)
+          client = BambuClient.from_dict(request.json['info'])
       else:
           return web.json_response(code = 400, msg= '不支持的打印机类型：' + type)  # 不支持的打印机类型
       
-      config.add_printer(f'{type}_{uuid.uuid1()}', client)
+      config.add_printer(f'{type}_{uuid.uuid1()}', client, alias)
       config.save()
+      
+      main.restart()
 
       return web.json_response()
     except Exception as e:
@@ -32,9 +36,11 @@ def add(request: dot.Request):
 
 @app.route('/remove')
 def remove(request: dot.Request):
-    id = request.json["id"]
+    id = request.args["printer_id"]
     config.remove_printer(id)
     config.save()
+
+    main.restart()
 
     return web.json_response()
 

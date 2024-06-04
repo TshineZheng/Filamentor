@@ -78,3 +78,10 @@ def set_fila_change_temp(request: dot.Request):
             return web.json_response()
 
     return web.error_response(msg='打印机未找到')
+
+
+@app.route('/restart')
+def restart(request: dot.Request):
+    import main
+    main.restart()
+    return web.json_response()

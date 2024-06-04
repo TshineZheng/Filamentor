@@ -358,6 +358,7 @@ class BambuClient(PrinterClient, TAGLOG):
 
 
 class BambuBrokenDetect(BrokenDetect):
+    @staticmethod
     def type_name() -> str:
         return "bambu_broken_detect"
 

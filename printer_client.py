@@ -107,7 +107,8 @@ class PrinterClient(BaseUnit):
         Args:
             callback (Callable[[Action, Any], None]): 回调函数
         """
-        self.action_callbacks.remove(callback)
+        if callback in self.action_callbacks:
+            self.action_callbacks.remove(callback)
 
     def on_action(self, action: Action, data: Any = None):
         """回调派发, 打印机的信息派发给所有订阅的回调

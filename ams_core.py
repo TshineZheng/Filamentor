@@ -160,6 +160,9 @@ class AMSCore(TAGLOG):
     def stop(self):
         self.printer_client.remove_on_action(self.on_printer_action)
 
+    def hasTask(self):
+        return self.task_name is not None and self.task_name != ''
+
     def run_filament_change(self, next_filament: int, before_done: Callable = None):
         if self.fila_changing:
             return
@@ -264,3 +267,9 @@ class AMSCore(TAGLOG):
         self.fila_changing = False
 
 ams_list:list[AMSCore] = []
+
+def hasPrintTaskRunning():
+    for a in ams_list:
+        if a.hasTask():
+            return True
+    return False

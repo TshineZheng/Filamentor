@@ -55,6 +55,8 @@ class YBAAMSController(Controller):
         self.disconnect()
         if self.thread:
             self.thread.join()
+            self.sock = None
+            self.thread = None
 
     def connect(self):
         self.disconnect()

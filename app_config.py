@@ -1,5 +1,5 @@
 import json
-from typing import List
+from typing import List, Tuple
 
 from broken_detect import BrokenDetect
 from controller import Controller
@@ -14,7 +14,7 @@ import consts
 from utils.log import LOGE
 
 class ChannelRelation:
-    def __init__(self, printer_id: str, controller_id: str, channel: int) -> None:
+    def __init__(self, printer_id: str, controller_id: str, channel: int, filament_type: str, filament_color: str) -> None:
         """打印机和通道的绑定关系
 
         Args:
@@ -25,12 +25,16 @@ class ChannelRelation:
         self.printer_id = printer_id
         self.controller_id = controller_id
         self.channel = channel
+        self.filament_type = filament_type
+        self.filament_color = filament_color
 
     def to_dict(self):
         return {
             "printer_id": self.printer_id,
             "controller_id": self.controller_id,
-            "channel": self.channel
+            "channel": self.channel,
+            "filament_type": self.filament_type,
+            "filament_color": self.filament_color
         }
 
     @classmethod
@@ -38,7 +42,9 @@ class ChannelRelation:
         return cls(
             data["printer_id"],
             data["controller_id"],
-            data["channel"]
+            data["channel"],
+            data["filament_type"],
+            data["filament_color"]
         )
 
 
@@ -68,15 +74,17 @@ class DetectRelation:
 
 
 class IDPrinterClient:
-    def __init__(self, id: str, client: PrinterClient, change_temp: int = 255) -> None:
+    def __init__(self, id: str, client: PrinterClient, change_temp: int = 255, alias: str = None) -> None:
         self.id = id
         self.client = client
         self.change_temp = change_temp
+        self.alias = alias
 
     def to_dict(self):
         return {
             "id": self.id,
             'type': self.client.type_name(),
+            "alias": self.alias,
             "info": self.client.to_dict(),
             "change_temp": self.change_temp
         }
@@ -86,21 +94,24 @@ class IDPrinterClient:
         id = data["id"]
         type = data["type"]
         change_temp = data["change_temp"]
+        alias = data["alias"]
         client = None
         if type == BambuClient.type_name():
             client = BambuClient.from_dict(data["info"])
-        return cls(id, client, change_temp)
+        return cls(id, client, change_temp, alias)
 
 
 class IDController:
-    def __init__(self, id: str, controller: Controller) -> None:
+    def __init__(self, id: str, controller: Controller, alias: str = None) -> None:
         self.id = id
         self.controller = controller
+        self.alias = alias
 
     def to_dict(self):
         return {
             "id": self.id,
             'type': self.controller.type_name(),
+            "alias": self.alias,
             "info": self.controller.to_dict()
         }
 
@@ -108,6 +119,7 @@ class IDController:
     def from_dict(cls, data: dict):
         id = data["id"]
         type = data["type"]
+        alias = data["alias"]
         controller = None
         if type == YBAAMSController.type_name():
             controller = YBAAMSController.from_dict(data["info"])
@@ -115,18 +127,20 @@ class IDController:
             controller = YBAAMSPYController.from_dict(data["info"])
         elif type == YBAAMSServoController.type_name():
             controller = YBAAMSServoController.from_dict(data["info"])
-        return cls(id, controller)
+        return cls(id, controller, alias)
 
 
 class IDBrokenDetect:
-    def __init__(self, id: str, detect: BrokenDetect) -> None:
+    def __init__(self, id: str, detect: BrokenDetect, alias: str = None) -> None:
         self.id = id
         self.detect = detect
+        self.alias = alias
 
     def to_dict(self):
         return {
             "id": self.id,
             'type': self.detect.type_name(),
+            "alias": self.alias,
             "info": self.detect.to_dict()
         }
 
@@ -134,10 +148,11 @@ class IDBrokenDetect:
     def from_dict(cls, data: dict):
         id = data["id"]
         type = data["type"]
+        alias = data["alias"]
         detect = None
         if type == MQTTBrokenDetect.type_name():
             detect = MQTTBrokenDetect.from_dict(data["info"])
-        return cls(id, detect)
+        return cls(id, detect, alias)
 
 class AMSSettings:
     def __init__(self, cur_filament: int, change_temp: int) -> None:
@@ -154,12 +169,18 @@ class AppConfig():
         self.load_from_file()
 
     def load_from_dict(self, data: dict):
-        self.printer_list = [IDPrinterClient.from_dict(i) for i in data["printer_list"]]
-        self.controller_list = [IDController.from_dict(i) for i in data["controller_list"]]
-        self.detect_list = [IDBrokenDetect.from_dict(i) for i in data["detect_list"]]
-        self.channel_relations = [ChannelRelation.from_dict(i) for i in data["channel_relations"]]
-        self.detect_relations = [DetectRelation.from_dict(i) for i in data["detect_relations"]]
-        self.mqtt_config = MQTTConfig.from_dict(data["mqtt_config"])
+        if "printer_list" in data:
+            self.printer_list = [IDPrinterClient.from_dict(i) for i in data["printer_list"]]
+        if "controller_list" in data:
+            self.controller_list = [IDController.from_dict(i) for i in data["controller_list"]]
+        if "detect_list" in data:
+            self.detect_list = [IDBrokenDetect.from_dict(i) for i in data["detect_list"]]
+        if "channel_relations" in data:
+            self.channel_relations = [ChannelRelation.from_dict(i) for i in data["channel_relations"]]
+        if "detect_relations" in data:
+            self.detect_relations = [DetectRelation.from_dict(i) for i in data["detect_relations"]]
+        if "mqtt_config" in data:
+            self.mqtt_config = MQTTConfig.from_dict(data["mqtt_config"])
     
     def load_from_file(self):
         try:
@@ -184,13 +205,13 @@ class AppConfig():
         with open(f'{consts.STORAGE_PATH}filamentor_config.json', 'w') as f:
             json.dump(self.to_dict(), f, ensure_ascii=False, indent=4)
     
-    def add_printer(self, id: str, client: PrinterClient) -> bool:
+    def add_printer(self, id: str, client: PrinterClient, alias: str) -> bool:
         # 确保id不重复
         for p in self.printer_list:
             if p.id == id:
                 return False
             
-        self.printer_list.append(IDPrinterClient(id, client))
+        self.printer_list.append(IDPrinterClient(id, client, alias=alias))
         return True
     
     def remove_printer(self, id: str):
@@ -207,14 +228,17 @@ class AppConfig():
                 return
 
     
-    def add_controller(self, id: str, controller: Controller) -> bool:
-        # 确保id不重复
+    def add_controller(self, id: str, controller: Controller, alias: str) -> Tuple[bool, str]:
+        # 确保控制器不重复
         for p in self.controller_list:
-            if p.id == id:
-                return False
+            if p.controller.type_name() == controller.type_name():
+                # YBA-AMS like controller exists
+                if controller.type_name() == YBAAMSController.type_name() or controller.type_name() == YBAAMSPYController.type_name() or controller.type_name() == YBAAMSServoController.type_name():
+                    if p.controller.ip == controller.ip:
+                        return False, '控制器已存在'
             
-        self.controller_list.append(IDController(id, controller))
-        return True
+        self.controller_list.append(IDController(id, controller, alias))
+        return True,'控制器创建成功'
     
     def remove_controller(self, id: str):
         for p in self.controller_list[:]:
@@ -225,13 +249,13 @@ class AppConfig():
                     if c.controller_id == id:
                         self.channel_relations.remove(c)
 
-    def add_detect(self, id: str, detect: BrokenDetect) -> bool:
+    def add_detect(self, id: str, detect: BrokenDetect, alias: str) -> bool:
         # 确保id不重复
         for p in self.detect_list:
             if p.id == id:
                 return False
             
-        self.detect_list.append(IDBrokenDetect(id, detect))
+        self.detect_list.append(IDBrokenDetect(id, detect, alias))
         return True
     
     def remove_detect(self, id: str):

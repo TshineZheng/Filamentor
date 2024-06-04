@@ -75,10 +75,10 @@ def test_remove_printer():
 def test_add_controller():
     config = make_config()
     bambu_client = BambuClient(BambuClientConfig("127.0.0.3", 'lan_pwd', "device_serial"))
-    assert config.add_controller('yba_ams_3', bambu_client) == True
+    assert config.add_controller('yba_ams_3', bambu_client, 'ams1') == True,any
     assert config.controller_list[-1].id == 'yba_ams_3'
 
-    assert config.add_controller('yba_ams_3', bambu_client) == False
+    assert config.add_controller('yba_ams_3', bambu_client,'ams1') == False,any
 
 def test_remove_controller():
     config = make_config()

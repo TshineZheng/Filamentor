@@ -1,3 +1,4 @@
+![](doc/image1.jpg)
 # 介绍
 Filamentor = Filament + mentor，这是一个3D打印机进退料管理系统（多色打印）。
 

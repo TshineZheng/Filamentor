@@ -12,15 +12,21 @@ Filamentor = Filament + mentor，这是一个3D打印机进退料管理系统（
         - 被动
     - 退料
 - 断料检测
+- 可视化配置
 
 ### 待完成
-- 可视化配置
+
 - 自发现
 - 待补充
 
 # 已适配硬件
 - [YBA-AMS-PY](https://github.com/TshineZheng/YBA-AMS-ESP-PY) (修复四通道问题 以及 优化掉线)
 - [YBA-AMS](https://makerworld.com/zh/models/396276)
+
+# 使用
+双击 `start.bat` 即可。
+
+如果需要配置，访问启动时提示的链接即可进行配置。
 
 # 背景
 灵感来源于 [YBA-AMS-Python](https://github.com/YBA0312/YBA-AMS-Python) 项目，在接触和交流过程中，发现有能力修改优化的用户都在重头开始设计硬件，并将逻辑和硬件强制绑定，纵使有其合理合情的原因，但仍然使得已经被制作出来的硬件很可能被淘汰，这将造成浪费，而我认为换料在宏观角度看，无非是：暂停、退料、送料、继续。所以何不尝试独立出这部分，让硬件更加独立专注的优化迭代。

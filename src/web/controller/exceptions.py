@@ -24,3 +24,6 @@ class ControllerInfoError(BadRequest):
 
 class ControllerChannelActionError(BadRequest):
     DETAIL = "控制器通道动作有误"
+
+class ChannelDuplicate(BadRequest):
+    DETAIL = "请求设置的通道有重复"

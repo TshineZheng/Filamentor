@@ -100,8 +100,6 @@ async def startup_event():
     logger.remove(0)
     logger.add(sys.stderr, level="INFO")
 
-    LOGI(f'startup_event')
-
     consts.setup()
     core_services.start()
 
@@ -109,9 +107,10 @@ async def startup_event():
         global httpfront
         httpfront = http.server.HTTPServer(('', 8001), Handler)
         threading.Thread(target=httpfront.serve_forever).start()
-        print("===================================")
-        print("| 管理后台: http://localhost:8001 |")
-        print("===================================")
+        print("========================================")
+        print("| 管理页面: http://localhost:8001      |")
+        print("| 接口文档: http://localhost:7170/docs |")
+        print("========================================")
 
 
 @app.on_event("shutdown")

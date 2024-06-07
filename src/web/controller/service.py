@@ -1,4 +1,4 @@
-from typing import Union
+from typing import List, Union
 import uuid
 from src.controller import ChannelAction, Controller
 from src.impl.yba_ams_controller import YBAAMSController
@@ -7,7 +7,7 @@ from src.impl.yba_ams_servo_controller import YBAAMSServoController
 from src.web.controller.exceptions import ControllerInfoError, ControllerTaken, ControllerTypeNotMatch
 from src.app_config import config
 import src.core_services as core_services
-from src.web.controller.schemas import YBAAMSControllerInfoModel
+from src.web.controller.schemas import ControllerChannelModel, YBAAMSControllerInfoModel
 
 
 async def add_controller(type: str, alias: str, info: Union[YBAAMSControllerInfoModel]) -> Controller:
@@ -29,8 +29,8 @@ async def add_controller(type: str, alias: str, info: Union[YBAAMSControllerInfo
     for c in config.controller_list:
         if c.controller == contorller:
             raise ControllerTaken()
-        
-    #TODO: 需要验证控制器是否可用
+
+    # TODO: 需要验证控制器是否可用
 
     config.add_controller(f'{type}_{uuid.uuid1()}', contorller, alias)
     config.save()
@@ -43,8 +43,10 @@ async def remove_controller(id: str):
     core_services.restart()
 
 
-async def bind_printer(controller_id: str, printer_id: str, channel: int):
-    config.add_channel_setting(printer_id, controller_id, channel)
+async def bind_printer(printer_id: str, channels: List[ControllerChannelModel]):
+    for c in channels:
+        config.add_channel_setting(printer_id, c.controller_id, c.channel)
+
     config.save()
     core_services.restart()
 

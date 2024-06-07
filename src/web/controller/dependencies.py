@@ -1,9 +1,10 @@
-from fastapi import Depends
+from typing import List
+from fastapi import Depends, Query
 from src.controller import ChannelAction
 from src.impl.yba_ams_controller import YBAAMSController
 from src.impl.yba_ams_py_controller import YBAAMSPYController
 from src.impl.yba_ams_servo_controller import YBAAMSServoController
-from src.web.controller.exceptions import ControllerChannelBinded, ControllerChannelActionError, ControllerChannelNotFoundError, ControllerChannelUnBinded, ControllerNotFoundError, ControllerTypeNotMatch
+from src.web.controller.exceptions import ChannelDuplicate, ControllerChannelBinded, ControllerChannelActionError, ControllerChannelNotFoundError, ControllerChannelUnBinded, ControllerNotFoundError, ControllerTypeNotMatch
 
 from src.app_config import config
 from src.web.controller.schemas import ControllerChannelModel
@@ -34,18 +35,28 @@ async def valid_controller_channel(channel: int, controller_id: str = Depends(va
                 return ControllerChannelModel(controller_id=controller_id, channel=channel)
     raise ControllerChannelNotFoundError()
 
-async def valid_channel_binded(channel: int, controller_id: str = Depends(valid_controller_id_exist)) -> ControllerChannelModel:
+
+async def valid_channel_binded(channels: List[int] = Query(alias='channels'), controller_id: str = Depends(valid_controller_id_exist)) -> List[ControllerChannelModel]:
+    if len(channels) != len(set(channels)):
+        raise ChannelDuplicate()
+
+    for channel in channels:
+        await valid_controller_channel(channel, controller_id)
+
     for c in config.channel_relations:
-        if c.controller_id == controller_id and c.channel == channel:
-            raise ControllerChannelBinded()
-        
-    return ControllerChannelModel(controller_id=controller_id, channel=channel)
+        for channel in channels:
+            if c.controller_id == controller_id and c.channel == channel:
+                raise ControllerChannelBinded()
+
+    return [ControllerChannelModel(controller_id=controller_id, channel=channel) for channel in channels]
+
 
 async def valid_channel_unbinded(channel: int, controller_id: str = Depends(valid_controller_id_exist)) -> ControllerChannelModel:
     for c in config.channel_relations:
         if c.controller_id == controller_id and c.channel == channel:
             return ControllerChannelModel(controller_id=controller_id, channel=channel)
     raise ControllerChannelUnBinded()
+
 
 async def valid_channel_action(action: int) -> ChannelAction:
     if action == ChannelAction.PUSH.value or action == ChannelAction.PULL.value or action == ChannelAction.STOP.value:

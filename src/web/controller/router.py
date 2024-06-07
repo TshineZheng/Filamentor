@@ -1,4 +1,4 @@
-from typing import Union
+from typing import List, Union
 from fastapi import APIRouter, Depends
 
 from src.controller import ChannelAction
@@ -30,9 +30,9 @@ async def delete_controller(
 @router.post('/bind_printer', dependencies=[Depends(valid_ams_printer_task)])
 async def bind_printer(
         printer_id: str = Depends(valid_printer_id_exist),
-        channel: ControllerChannelModel = Depends(valid_channel_binded),
+        channels: List[ControllerChannelModel] = Depends(valid_channel_binded),
 ):
-    await service.bind_printer(controller_id=channel.controller_id, printer_id=printer_id, channel=channel.channel)
+    await service.bind_printer(printer_id=printer_id, channels=channels)
 
 
 @router.post('/unbind_printer', dependencies=[Depends(valid_ams_printer_task)])

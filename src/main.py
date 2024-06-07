@@ -87,6 +87,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, directory='web')
 
+    def log_message(self, format: str, *args: Any) -> None:
+        pass
+
 
 @app.on_event("startup")
 async def startup_event():

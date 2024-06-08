@@ -130,7 +130,7 @@ class AMSCore(TAGLOG):
 
     def start_task_log(self):
         from loguru import logger as LOG
-        import consts
+        import src.consts as consts
 
         self.task_log_id = LOG.add(
             sink = f'{consts.STORAGE_PATH}/logs/task/{self.task_name}_{datetime.now().strftime("%Y%m%d-%H%M%S")}.log',

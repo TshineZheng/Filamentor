@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from src.controller import ChannelAction
 from src.web.controller import service
 from src.web.controller.dependencies import valid_channel_binded, valid_channel_unbinded, valid_controller_channel, valid_controller_id_exist, valid_controller_type, valid_channel_action
-from src.web.controller.schemas import ControllerChannelModel, YBAAMSControllerInfoModel
+from src.web.controller.schemas import ControllerChannelModel, YBAAMSControllerModel
 from src.web.printer.dependencies import valid_ams_printer_task, valid_printer_id_exist
 
 
@@ -14,7 +14,7 @@ router = APIRouter()
 @router.put('/', dependencies=[Depends(valid_ams_printer_task)])
 async def add_controller(
     alias: str,
-    info: Union[YBAAMSControllerInfoModel],
+    info: Union[YBAAMSControllerModel],
     type: str = Depends(valid_controller_type)
 ):
     await service.add_controller(type, alias, info)

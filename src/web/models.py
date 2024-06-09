@@ -3,7 +3,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel as bm, ConfigDict, model_validator
 
 
 def convert_datetime_to_gmt(dt: datetime) -> str:
@@ -13,7 +13,7 @@ def convert_datetime_to_gmt(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%S%z")
 
 
-class CustomModel(BaseModel):
+class BaseModel(bm):
     model_config = ConfigDict(
         json_encoders={datetime: convert_datetime_to_gmt},
         populate_by_name=True,

@@ -7,10 +7,10 @@ from src.impl.yba_ams_servo_controller import YBAAMSServoController
 from src.web.controller.exceptions import ControllerInfoError, ControllerTaken, ControllerTypeNotMatch
 from src.app_config import config
 import src.core_services as core_services
-from src.web.controller.schemas import ControllerChannelModel, YBAAMSControllerInfoModel
+from src.web.controller.schemas import ControllerChannelModel, YBAAMSControllerModel
 
 
-async def add_controller(type: str, alias: str, info: Union[YBAAMSControllerInfoModel]) -> Controller:
+async def add_controller(type: str, alias: str, info: Union[YBAAMSControllerModel]) -> Controller:
     contorller = None
 
     try:

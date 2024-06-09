@@ -7,7 +7,7 @@ from src.web.exceptions import DetailedHTTPException
 from src.web.printer.exceptions import ChannelNotFoundError, PrinterHasTaskError, PrinterInfoError, PrinterNotFoundError, PrinterTaken, PrinterTypeNotMatch
 from src.app_config import config
 import src.core_services as core_services
-from src.web.printer.schemas import BambuPrinterInfo
+from src.web.printer.schemas import BambuPrinterModel
 
 
 async def valid_printer_type(type:str) -> str:
@@ -17,7 +17,7 @@ async def valid_printer_type(type:str) -> str:
         raise PrinterTypeNotMatch()
 
 
-async def valid_printer_taken(info: Union[BambuPrinterInfo], type: str = Depends(valid_printer_type)) -> PrinterClient:
+async def valid_printer_taken(info: Union[BambuPrinterModel], type: str = Depends(valid_printer_type)) -> PrinterClient:
     printer_client: PrinterClient = None
 
     if type == BambuClient.type_name():

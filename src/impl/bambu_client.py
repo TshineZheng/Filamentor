@@ -15,7 +15,7 @@ BAMBU_CLIENT_ID = "Filamentor-Bambu-Client"
 USERNAME = "bblp"
 
 bambu_resume = '{"print":{"command":"resume","sequence_id":"1"},"user_id":"1"}'
-bambu_pause = '{"print": {"sequence_id": "0","command": "pause","param": ""}}'
+bambu_pause = '{"print": {"command": "gcode_line","sequence_id": "1","param": "M400U1"},"user_id": "1"}'
 bambu_unload = '{"print":{"command":"ams_change_filament","curr_temp":220,"sequence_id":"1","tar_temp":220,"target":255},"user_id":"1"}'
 bambu_load = '{"print":{"command":"ams_change_filament","curr_temp":220,"sequence_id":"1","tar_temp":220,"target":254},"user_id":"1"}'
 bambu_done = '{"print":{"command":"ams_control","param":"done","sequence_id":"1"},"user_id":"1"}'

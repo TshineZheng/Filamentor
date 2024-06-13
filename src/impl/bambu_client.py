@@ -15,7 +15,7 @@ BAMBU_CLIENT_ID = "Filamentor-Bambu-Client"
 USERNAME = "bblp"
 
 bambu_resume = '{"print":{"command":"resume","sequence_id":"1"},"user_id":"1"}'
-bambu_pause = '{"print": {"command": "gcode_line","sequence_id": "1","param": "M400U1"},"user_id": "1"}'
+bambu_pause = '{"print": {"sequence_id": "0","command": "pause","param": ""}}'
 bambu_unload = '{"print":{"command":"ams_change_filament","curr_temp":220,"sequence_id":"1","tar_temp":220,"target":255},"user_id":"1"}'
 bambu_load = '{"print":{"command":"ams_change_filament","curr_temp":220,"sequence_id":"1","tar_temp":220,"target":254},"user_id":"1"}'
 bambu_done = '{"print":{"command":"ams_control","param":"done","sequence_id":"1"},"user_id":"1"}'
@@ -84,6 +84,8 @@ class BambuClient(PrinterClient, TAGLOG):
         self.cur_layer = 0
         self.new_filament_temp = 0
         self.next_extruder = -1
+
+        # self.trigger_pause = False
 
     @classmethod
     def from_dict(cls, config: dict):
@@ -178,6 +180,7 @@ class BambuClient(PrinterClient, TAGLOG):
                     if next_extruder != self.next_extruder:
                         LOGI(f'next_extruder: {next_extruder} new_filament_temp: {new_filament_temp}')
                         if ast(json_print, 'gcode_state', 'PAUSE'):  # 暂停状态
+                            # self.trigger_pause = False
                             self.next_extruder = next_extruder
                             self.new_filament_temp = new_filament_temp
                             self.on_action(Action.CHANGE_FILAMENT, {
@@ -185,8 +188,10 @@ class BambuClient(PrinterClient, TAGLOG):
                                 'next_filament_temp': self.new_filament_temp
                             })
                         else:
-                            LOGI('收到换色指令，但非暂停状态，发送暂停指令')
-                            self.publish_pause()
+                            # if not self.trigger_pause:
+                            #     LOGI('收到换色指令，但非暂停状态，发送暂停指令')
+                            #     self.publish_pause()
+                            #     self.trigger_pause = True
                             self.publish_status()
                 else:
                     self.cur_layer = layer_num
@@ -240,6 +245,8 @@ class BambuClient(PrinterClient, TAGLOG):
             M109 S{pre_tem}
             """.replace('\n', '\\n')
         )
+
+        time.sleep(2)
 
     def resume(self):
         super().resume()

@@ -31,14 +31,11 @@ G1 X-13.5 F18000
 M17 R
 
 M73 L{1000 + next_extruder * 1000 + new_filament_temp} ; Post next_extruder and filament_temp, When changing filament, the number of layers will not change.
-
-M109 S{old_filament_temp + 1} ; temp command, waiting
-M400 S3 ; MQTT reports the temperature once every 2 seconds.
+M400 U1
+M73 L{layer_num+1} ; restore layer_num
 
 {if next_extruder < 255}
 M400
-
-M73 L{layer_num+1} ; restore layer_num
 
 G92 E0
 

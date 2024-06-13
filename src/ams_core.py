@@ -197,8 +197,6 @@ class AMSCore(TAGLOG):
         self.LOGI(f"等待通道 {self.fila_cur + 1} 退料完成")
         self.printer_client.on_unload(next_filament_temp)
 
-        time.sleep(2)
-
         self.LOGI(f'通道 {self.fila_cur} 开始回抽')
         self.driver_control(self.fila_cur, ChannelAction.PULL)   # 回抽当前通道
 

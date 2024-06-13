@@ -1,6 +1,6 @@
 ; ===== machine: Bambu A1 mini =============
-; ===== date: 20240601 =====================
-; ===== Filamentor V0.2 ====================
+; ===== date: 20240613 =====================
+; ===== Filamentor V0.3 ====================
 ; ===== Based on the official A1 mini change filament gcode (20231225)======
 
 G392 S0
@@ -30,13 +30,15 @@ G1 X180 F3000
 G1 X-13.5 F18000
 M17 R
 
-; Filamentor
-M73 L{1000 + next_extruder} ; Post next_extruder.
-M400 U1
-M73 L{layer_num+1} ; restore layer_num
+M73 L{1000 + next_extruder * 1000 + new_filament_temp} ; Post next_extruder and filament_temp, When changing filament, the number of layers will not change.
+
+M109 S{old_filament_temp + 1} ; temp command, waiting
+M400 S3 ; MQTT reports the temperature once every 2 seconds.
 
 {if next_extruder < 255}
 M400
+
+M73 L{layer_num+1} ; restore layer_num
 
 G92 E0
 

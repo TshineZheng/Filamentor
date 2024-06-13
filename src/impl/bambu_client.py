@@ -26,6 +26,7 @@ MAGIC_CHANNEL = 1000
 MAGIC_COMMAND = 2000
 MAGIC_AWAIT = MAGIC_COMMAND
 
+
 class BambuClientConfig(object):
 
     def __init__(self, printer_ip: str, lan_password: str, device_serial: str) -> None:
@@ -39,10 +40,10 @@ class BambuClient(PrinterClient, TAGLOG):
     @staticmethod
     def type_name() -> str:
         return "bambu_client"
-    
+
     def tag(self):
         return self.type_name()
-    
+
     def __eq__(self, other):
         if isinstance(other, BambuClient):
             return self.config.printer_ip == other.config.printer_ip
@@ -59,7 +60,8 @@ class BambuClient(PrinterClient, TAGLOG):
 
         client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=BAMBU_CLIENT_ID)
         # 设置TLS
-        client.tls_set(cert_reqs=ssl.CERT_NONE)  # 如果服务器使用自签名证书，请使用ssl.CERT_NONE
+        # 如果服务器使用自签名证书，请使用ssl.CERT_NONE
+        client.tls_set(cert_reqs=ssl.CERT_NONE)
         client.tls_insecure_set(True)  # 只有在使用自签名证书时才设置为True
 
         # 设置用户名和密码
@@ -72,11 +74,16 @@ class BambuClient(PrinterClient, TAGLOG):
 
         self.client = client
 
+        self.clean()
+
+    def clean(self):
         self.wating_pause_flag = False
         self.mc_percent = 0
         self.mc_remaining_time = 0
         self.magic_command = 0
         self.cur_layer = 0
+        self.new_filament_temp = 0
+        self.next_extruder = -1
 
     @classmethod
     def from_dict(cls, config: dict):
@@ -123,7 +130,7 @@ class BambuClient(PrinterClient, TAGLOG):
     def on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
         if not self.is_running:
             return
-        
+
         LOGE("连接已断开，请检查打印机状态，以及是否有其它应用占用了打印机")
         self.reconnect(client)
 
@@ -152,7 +159,7 @@ class BambuClient(PrinterClient, TAGLOG):
         except Exception as e:
             LOGE(f"JSON解析失败: {e}")
             return
-        
+
         if 'print' not in json_data:
             return
 
@@ -161,18 +168,28 @@ class BambuClient(PrinterClient, TAGLOG):
         if 'layer_num' in json_print:
             layer_num = json_print["layer_num"]
             if not ast(json_print, 'print_type', 'idle'):   # 非空闲状态
-                if layer_num >= MAGIC_COMMAND:
-                    self.magic_command = layer_num
-                else:
-                    self.magic_command = 0
-                    if layer_num >= MAGIC_CHANNEL:
-                        if not ast(json_print, 'gcode_state', 'PAUSE'): # 暂停状态
-                            LOGW('收到换色指令，但打印机不是暂停状态，重新刷新状态')
-                            self.publish_status()
+                if layer_num >= MAGIC_CHANNEL:
+                    # 解码 num
+                    num_adjusted = layer_num - MAGIC_CHANNEL
+                    # 提取 next_extruder
+                    next_extruder = num_adjusted // 1000
+                    # 提取 new_filament_temp
+                    new_filament_temp = num_adjusted % 1000
+                    if next_extruder != self.next_extruder:
+                        LOGI(f'next_extruder: {next_extruder} new_filament_temp: {new_filament_temp}')
+                        if ast(json_print, 'gcode_state', 'PAUSE'):  # 暂停状态
+                            self.next_extruder = next_extruder
+                            self.new_filament_temp = new_filament_temp
+                            self.on_action(Action.CHANGE_FILAMENT, {
+                                'next_extruder': next_extruder,
+                                'next_filament_temp': self.new_filament_temp
+                            })
                         else:
-                            self.on_action(Action.CHANGE_FILAMENT, layer_num - MAGIC_CHANNEL)
-                    else:
-                        self.cur_layer = layer_num
+                            LOGI('收到换色指令，但非暂停状态，发送暂停指令')
+                            self.publish_pause()
+                            self.publish_status()
+                else:
+                    self.cur_layer = layer_num
 
         if 'mc_percent' in json_print:
             self.mc_percent = json_print["mc_percent"]
@@ -181,7 +198,8 @@ class BambuClient(PrinterClient, TAGLOG):
             self.mc_remaining_time = json_print["mc_remaining_time"]
 
         if "hw_switch_state" in json_print:
-            self.on_action(Action.FILAMENT_SWITCH, FilamentState.YES if json_print["hw_switch_state"] == 1 else FilamentState.NO)
+            self.on_action(Action.FILAMENT_SWITCH,
+                           FilamentState.YES if json_print["hw_switch_state"] == 1 else FilamentState.NO)
 
         if 'command' in json_print:
             if json_print["command"] == 'project_file':
@@ -202,10 +220,12 @@ class BambuClient(PrinterClient, TAGLOG):
             if 'FINISH' == gcode_state:
                 if self.mc_percent == 100 and 'subtask_name' in json_print:
                     self.on_action(Action.TASK_FINISH, json_print['subtask_name'])
+                    self.clean()
+
             if 'FAILED' == gcode_state:
                 if ast(json_print, 'print_error', 50348044):
                     self.on_action(Action.TASK_FAILED)
-
+                    self.clean()
 
     def refresh_status(self):
         self.publish_status()
@@ -217,13 +237,9 @@ class BambuClient(PrinterClient, TAGLOG):
         self.publish_gcode(
             f"""
             G1 E-28 F500
-            M400
-            M73 L{MAGIC_AWAIT}
             M109 S{pre_tem}
             """.replace('\n', '\\n')
         )
-
-        self.waiting_magic_command(MAGIC_AWAIT) # 等待上面的gcode执行完成
 
     def resume(self):
         super().resume()
@@ -246,7 +262,7 @@ class BambuClient(PrinterClient, TAGLOG):
 
     def filament_broken_detect(self) -> BrokenDetect:
         return self.fbd
-    
+
     def waiting_pause(self):
         self.waiing_199_flag = False
         while not self.wating_pause_flag:
@@ -258,7 +274,7 @@ class BambuClient(PrinterClient, TAGLOG):
             self.publish_status()
             time.sleep(1)
         self.LOGD(f'magic command {magic_code} received')
-    
+
     def change_filament(self, ams, next_fila: int, change_temp: int = 255):
         # time.sleep(10)
         # self.LOGI('发送暂停指令')
@@ -348,7 +364,7 @@ class BambuClient(PrinterClient, TAGLOG):
                                 # 检查是否包含特定字符串
                                 if line_str.startswith('M620 S'):
                                     # 找到匹配的行，返回内容
-                                    text =  line_str.strip()
+                                    text = line_str.strip()
                                     import re
                                     # 正则表达式模式，用于匹配'M620 S'后面的数字，直到遇到非数字字符
                                     pattern = r'M620 S(\d+)'

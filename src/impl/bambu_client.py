@@ -229,8 +229,9 @@ class BambuClient(PrinterClient, TAGLOG):
 
             if 'FAILED' == gcode_state:
                 if ast(json_print, 'print_error', 50348044):
-                    self.on_action(Action.TASK_FAILED)
-                    self.clean()
+                    if 'subtask_name' in json_print:
+                        self.on_action(Action.TASK_FAILED, json_print['subtask_name'])
+                        self.clean()
 
     def refresh_status(self):
         self.publish_status()

@@ -16,6 +16,7 @@ async def get_config():
 async def sync():
     controller_state: List[dict] = []
     ams_info: List[dict] = []
+    detect_info: List[dict] = []
 
     for c in config.controller_list:
         controller_state.append(
@@ -32,4 +33,10 @@ async def sync():
             'cur_task': p.task_name
         })
 
-    return {'ams': ams_info, 'controller': controller_state}
+    for d in config.detect_list:
+        detect_info.append({
+            'detect_id': d.id,
+            'is_broken': d.detect.is_filament_broken()
+        })
+
+    return {'ams': ams_info, 'controller': controller_state, 'detect': detect_info}

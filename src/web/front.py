@@ -2,6 +2,8 @@
 import http.server
 from typing import Any
 
+from src.utils.net_util import get_ip_address
+
 front_server: http.server.HTTPServer = None
 
 
@@ -21,9 +23,11 @@ def start():
         global front_server
         front_server = http.server.HTTPServer(('', 8001), FrontHandler)
         threading.Thread(target=front_server.serve_forever).start()
+
+        myip = get_ip_address()
         print("========================================")
-        print("| 管理页面: http://localhost:8001      |")
-        print("| 接口文档: http://localhost:7170/docs |")
+        print(f"| 管理页面: http://{myip}:8001      |")
+        print(f"| 接口文档: http://{myip}:7170/docs |")
         print("========================================")
 
 

@@ -1,30 +1,14 @@
 from typing import List, Union
 import uuid
 from src.controller import ChannelAction, Controller
-from src.impl.yba_ams_controller import YBAAMSController
-from src.impl.yba_ams_py_controller import YBAAMSPYController
-from src.impl.yba_ams_servo_controller import YBAAMSServoController
-from src.web.controller.exceptions import ControllerInfoError, ControllerTaken, ControllerTypeNotMatch
+from src.web.controller.exceptions import ControllerTaken
 from src.app_config import config
 import src.core_services as core_services
 from src.web.controller.schemas import ControllerChannelModel, YBAAMSControllerModel
 
 
 async def add_controller(type: str, alias: str, info: Union[YBAAMSControllerModel]) -> Controller:
-    contorller = None
-
-    try:
-        if type == YBAAMSController.type_name():
-            contorller = YBAAMSController.from_dict(info.dict())
-        elif type == YBAAMSPYController.type_name():
-            contorller = YBAAMSPYController.from_dict(info.dict())
-        elif type == YBAAMSServoController.type_name():
-            contorller = YBAAMSServoController.from_dict(info.dict())
-    except Exception as e:
-        raise ControllerInfoError()
-
-    if contorller is None:
-        raise ControllerTypeNotMatch()
+    contorller = Controller.generate_controller(type, info.model_dump())
 
     for c in config.controller_list:
         if c.controller == contorller:

@@ -10,6 +10,7 @@ from src.impl.mqtt_broken_detect import MQTTBrokenDetect
 from src.impl.yba_ams_controller import YBAAMSController
 from src.impl.yba_ams_py_controller import YBAAMSPYController
 from src.impl.yba_ams_servo_controller import YBAAMSServoController
+from src.impl.yba_single_buffer_controller import YBASingleBufferController
 from src.mqtt_config import MQTTConfig
 from src.printer_client import PrinterClient
 from src.utils.log import LOGE, LOGI
@@ -124,13 +125,7 @@ class IDController:
         id = data["id"]
         type = data["type"]
         alias = data["alias"]
-        controller = None
-        if type == YBAAMSController.type_name():
-            controller = YBAAMSController.from_dict(data["info"])
-        elif type == YBAAMSPYController.type_name():
-            controller = YBAAMSPYController.from_dict(data["info"])
-        elif type == YBAAMSServoController.type_name():
-            controller = YBAAMSServoController.from_dict(data["info"])
+        controller = Controller.generate_controller(type, data["info"])
         return cls(id, controller, alias)
 
 
@@ -235,8 +230,8 @@ class AppConfig():
         for p in self.controller_list:
             if p.controller.type_name() == controller.type_name():
                 # YBA-AMS like controller exists
-                if controller.type_name() == YBAAMSController.type_name() or controller.type_name() == YBAAMSPYController.type_name() or controller.type_name() == YBAAMSServoController.type_name():
-                    if isinstance(controller, (YBAAMSController, YBAAMSPYController, YBAAMSServoController)):
+                if controller.type_name() == YBAAMSController.type_name() or controller.type_name() == YBAAMSPYController.type_name() or controller.type_name() == YBAAMSServoController.type_name() or controller.type_name() == YBASingleBufferController.type_name():
+                    if isinstance(controller, (YBAAMSController, YBAAMSPYController, YBAAMSServoController, YBASingleBufferController)):
                         if p.controller.ip == controller.ip:
                             return False, '控制器已存在'
 

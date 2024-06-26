@@ -6,6 +6,7 @@ import paho.mqtt.client as mqtt
 
 TOPIC = '/openams/filament_broken_detect'
 
+
 class MQTTBrokenDetect(BrokenDetect):
     """断料检测服务
 
@@ -32,7 +33,7 @@ class MQTTBrokenDetect(BrokenDetect):
     @classmethod
     def from_dict(cls, json_data: dict):
         return cls(MQTTConfig.from_dict(json_data['mqtt_config']))
-    
+
     def to_dict(self) -> dict:
         return {
             'mqtt_config': self.mqtt_config.to_dict()
@@ -82,10 +83,10 @@ class MQTTBrokenDetect(BrokenDetect):
             if self.latest_state != payload:
                 self.latest_state = payload
                 LOGI(f"断料检测：{'有料' if payload == '1' else '无料'}")
-        
+
     def get_latest_state(self):
         return self.latest_state
-    
+
     def is_filament_broken(self) -> bool:
         """判断是否断料
 
@@ -96,6 +97,6 @@ class MQTTBrokenDetect(BrokenDetect):
             return True
         else:
             return False
-        
+
     def safe_time(self) -> int:
         return 2.5

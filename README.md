@@ -21,6 +21,7 @@ Filamentor = Filament + mentor，这是一个3D打印机进退料管理系统（
 
 # 已适配硬件
 - [YBA-AMS-PY](https://github.com/TshineZheng/YBA-AMS-ESP-PY) (修复四通道问题 以及 优化掉线)
+- [YBA-AMS-PY 单缓冲](https://github.com/TshineZheng/YBA-AMS-ESP-PY/tree/single_buffer)
 - [YBA-AMS](https://makerworld.com/zh/models/396276)
 
 # 使用

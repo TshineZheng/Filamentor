@@ -14,17 +14,17 @@ async def get_config():
     detect_list = d['detect_list']
     detect_relation_list = d['detect_relations']
 
-    # TODO: 这里使用了[0]打印机，应该优化
-    printer = config.printer_list[0]
+    # 将所有打印机和控制器自带的断料检测器构造出来，还有关系
+    for printer in config.printer_list:
+        if printer.client.filament_broken_detect() is not None:
+            detect_list.append(IDBrokenDetect(printer.id, printer.client.filament_broken_detect(), printer.alias).to_dict())
+            detect_relation_list.append(DetectRelation(printer.id, printer.id).to_dict())
 
-    if printer.client.filament_broken_detect() is not None:
-        detect_list.append(IDBrokenDetect(printer.id, printer.client.filament_broken_detect(), printer.alias).to_dict())
-        detect_relation_list.append(DetectRelation(printer.id, printer.id).to_dict())
-
-    for c in config.controller_list:
-        if c.controller.get_broken_detect() is not None:
-            detect_list.append(IDBrokenDetect(c.id, c.controller.get_broken_detect(), c.alias).to_dict())
-            detect_relation_list.append(DetectRelation(printer.id, c.id).to_dict())
+        # FIXME： 控制器断料检测器绑定打印机的逻辑不对，断料检测器应该和通道或者控制器绑定，而不是和打印机绑定
+        for c in config.controller_list:
+            if c.controller.get_broken_detect() is not None:
+                detect_list.append(IDBrokenDetect(c.id, c.controller.get_broken_detect(), c.alias).to_dict())
+                detect_relation_list.append(DetectRelation(printer.id, c.id).to_dict())
 
     return d
 
@@ -34,6 +34,13 @@ async def sync():
     controller_state: List[dict] = []
     ams_info: List[dict] = []
     detect_info: List[dict] = []
+
+    for printer in config.printer_list:
+        if printer.client.filament_broken_detect() is not None:
+            detect_info.append({
+                'detect_id': printer.id,
+                'is_broken': printer.client.filament_broken_detect().is_filament_broken()
+            })
 
     for c in config.controller_list:
         controller_state.append(

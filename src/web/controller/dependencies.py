@@ -4,6 +4,7 @@ from src.controller import ChannelAction
 from src.impl.yba_ams_controller import YBAAMSController
 from src.impl.yba_ams_py_controller import YBAAMSPYController
 from src.impl.yba_ams_servo_controller import YBAAMSServoController
+from src.impl.yba_single_buffer_controller import YBASingleBufferController
 from src.web.controller.exceptions import ChannelDuplicate, ControllerChannelBinded, ControllerChannelActionError, ControllerChannelNotFoundError, ControllerChannelUnBinded, ControllerNotFoundError, ControllerTypeNotMatch
 
 from src.app_config import config
@@ -16,6 +17,8 @@ async def valid_controller_type(controller_type: str) -> str:
     elif controller_type == YBAAMSServoController.type_name():
         return controller_type
     elif controller_type == YBAAMSController.type_name():
+        return controller_type
+    elif controller_type == YBASingleBufferController.type_name():
         return controller_type
     else:
         raise ControllerTypeNotMatch()

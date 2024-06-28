@@ -63,19 +63,32 @@ class AMSCore(TAGLOG):
         if not c.is_initiative_push(i):
             c.control(i, ChannelAction.STOP)
 
-    def is_filament_broken(self) -> bool:
+    def is_filament_broken(self, printer_ch: int) -> bool:
         """当所有断料检测器都没有料时，返回 True
 
         Returns:
             bool: _description_
         """
+
+        # 如果控制器有自己的断料检测器，则只判断控制器是否断料
+        c, i = self.channels[printer_ch]
+        if c.get_broken_detect() is not None:
+            return c.get_broken_detect().is_filament_broken()
+
+        # 否则，判断所有断料检测器是否断料
         for bd in self.broken_detects:
             if bd.is_filament_broken() is not True:
                 return False
         return True
 
-    def get_max_broken_safe_time(self) -> int:
-        return max([bd.safe_time() for bd in self.broken_detects])
+    def get_pull_safe_time(self, printer_ch: int) -> int:
+        # 如果控制器有自己的断料检测器，则返回控制器的退料时间
+        c, i = self.channels[printer_ch]
+        if c.get_broken_detect() is not None:
+            return c.get_broken_detect().get_safe_time()
+
+        # 否则，返回所有断料检测器最大的退料时间
+        return max([bd.get_safe_time() for bd in self.broken_detects])
 
     def fila_shake(self, channel: int, action: ChannelAction, shake_time=1):
         self.driver_control(channel, ChannelAction.PULL if action == ChannelAction.PUSH else ChannelAction.PUSH)
@@ -213,7 +226,7 @@ class AMSCore(TAGLOG):
         ts = datetime.now().timestamp()
         max_pull_time = ts + UNLOAD_WARNING    # 最大退料时间，如果超出这个时间，则提醒用户
         # 等待所有断料检测器都没有料
-        while not self.is_filament_broken():
+        while not self.is_filament_broken(self.fila_cur):
             time.sleep(2)
             if datetime.now().timestamp() - ts > UNLOAD_TIMEOUT:
                 self.LOGI("退料超时，抖一抖")
@@ -225,7 +238,7 @@ class AMSCore(TAGLOG):
                 # TODO: 发出警报
 
         self.LOGI("退料检测到位")
-        safe_time = self.get_max_broken_safe_time()
+        safe_time = self.get_pull_safe_time(self.fila_cur)
         if safe_time > 0:
             time.sleep(safe_time)   # 再退一点
             self.LOGI("退料到安全距离")

@@ -98,5 +98,5 @@ class MQTTBrokenDetect(BrokenDetect):
         else:
             return False
 
-    def safe_time(self) -> int:
+    def get_safe_time(self) -> int:
         return 2.5

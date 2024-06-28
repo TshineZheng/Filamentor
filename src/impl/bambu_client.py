@@ -399,7 +399,7 @@ class BambuBrokenDetect(BrokenDetect):
         self.bambu_client.refresh_status()
         return FilamentState.NO == self.fila_state
 
-    def safe_time(self) -> float:
+    def get_safe_time(self) -> float:
         return 2
 
     def on_printer_action(self, action: Action, data):
@@ -413,4 +413,4 @@ class BambuBrokenDetect(BrokenDetect):
         self.bambu_client.remove_on_action(self.on_printer_action)
 
     def to_dict(self) -> dict:
-        pass
+        return super().to_dict()

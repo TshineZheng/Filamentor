@@ -4,10 +4,11 @@ from typing import List
 from src.controller import ChannelAction, Controller
 import socket
 
-from src.utils.log import LOGE, LOGI
+from src.utils.log import LOGD, LOGE, LOGI
 
 CH_MAP = [1, 2, 3, 4]  # 通道映射表
 ams_head = b'\x2f\x2f\xff\xfe\x01\x02'
+
 
 class YBAAMSController(Controller):
     @staticmethod
@@ -16,10 +17,10 @@ class YBAAMSController(Controller):
 
     def __init__(self, ip: str, port: int, channel_count: int):
         super().__init__(channel_count)
-        self.ip:str = ip
-        self.port:str = port
-        self.sock:socket.socket = None
-        self.ch_state:List[int] = [0, 0, 0, 0]
+        self.ip: str = ip
+        self.port: str = port
+        self.sock: socket.socket = None
+        self.ch_state: List[int] = [0, 0, 0, 0]
         self.thread: threading.Thread = None
         self.lock = threading.Lock()
 
@@ -48,13 +49,13 @@ class YBAAMSController(Controller):
             'port': self.port,
             'channel_total': self.channel_total
         }
-    
+
     def start(self):
         super().start()
         self.connect()
         self.thread = threading.Thread(target=self.heartbeat, name=f"yba-ams({self.ip}) heartbeat")
         self.thread.start()
-    
+
     def stop(self):
         super().stop()
         self.disconnect()
@@ -67,12 +68,13 @@ class YBAAMSController(Controller):
         self.disconnect()
         if self.is_running:
             self.sock = self.connect_to_server(self.ip, self.port)
-        
+
     def disconnect(self):
         if self.sock:
             try:
                 self.sock.shutdown(socket.SHUT_RDWR)
                 self.sock.close()
+                self.sock = None
             except Exception as e:
                 LOGE(f"关闭socket失败: {e}")
 
@@ -127,14 +129,14 @@ class YBAAMSController(Controller):
                     for i in range(4):
                         if not self.is_running:
                             break
-                        self.ams_control(i, self.ch_state[i]) # 心跳+同步状态 先这样写，后面再改
+                        self.ams_control(i, self.ch_state[i])  # 心跳+同步状态 先这样写，后面再改
                         time.sleep(0.3)
                     time.sleep(1)
 
     def control(self, channel_index: int, action: ChannelAction) -> bool:
         if False == super().control(channel_index, action):
             return False
-        
+
         if action == ChannelAction.PUSH:
             self.ams_control(channel_index, 1)
         elif action == ChannelAction.PULL:
@@ -143,6 +145,6 @@ class YBAAMSController(Controller):
             self.ams_control(channel_index, 0)
 
         return True
-    
+
     def is_initiative_push(self, channel_index: int) -> bool:
         return True

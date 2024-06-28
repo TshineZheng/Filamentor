@@ -3,6 +3,7 @@ from enum import Enum
 from typing import List
 
 from src.base_unit import BaseUnit
+from src.broken_detect import BrokenDetect
 from src.utils.log import LOGE
 
 
@@ -115,3 +116,6 @@ class Controller(BaseUnit):
             List[int]: 通道状态
         """
         pass
+
+    def get_broken_detect(self) -> 'BrokenDetect':
+        return None

@@ -16,7 +16,9 @@ class BrokenDetect(BaseUnit):
     def to_dict(self) -> dict:
         """保存配置
         """
-        pass
+        return {
+            'safe_time': self.get_safe_time(),
+        }
 
     @abstractmethod
     def start(self):
@@ -30,6 +32,6 @@ class BrokenDetect(BaseUnit):
     def is_filament_broken(self) -> bool:
         pass
 
-    def safe_time(self) -> float:
+    def get_safe_time(self) -> float:
         # 返回一个秒数，用于退料安全距离，默认为 0 s
         return 0

@@ -191,8 +191,8 @@ class AppConfig():
             with open(f'{consts.STORAGE_PATH}filamentor_config.json', 'r') as f:
                 data = json.load(f)
                 self.load_from_dict(data)
-        except:
-            LOGE("读取配置文件失败")
+        except Exception as e:
+            LOGE("读取配置文件失败", e)
             pass
 
     def to_dict(self):

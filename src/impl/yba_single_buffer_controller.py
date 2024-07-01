@@ -18,7 +18,7 @@ class YBASingleBufferController(YBAAMSPYController):
         self.is_fila_broken = False
 
     def ams_control(self, ch, fx):
-        for i in range(4):
+        for i in range(self.channel_total):
             self.ch_state[i] = 0
 
         self.ch_state[ch] = fx

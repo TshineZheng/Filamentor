@@ -6,8 +6,6 @@ import time
 from src.impl.yba_ams_controller import YBAAMSController
 from src.utils.log import LOGE, LOGI
 
-ams_sync = b'\x2f\x2f\xff\xfe\x02\x04'
-
 
 class YBAAMSPYController(YBAAMSController):
     """YBA-AMS-Python 版本，用 python 复刻原版，增加内存指令
@@ -103,7 +101,12 @@ class YBAAMSPYController(YBAAMSController):
         self.send_ams(b'\x2f\x2f\xff\xfe\xfe')
 
     def ams_sync(self):
-        self.send_ams(ams_sync + bytes([self.ch_state[0], self.ch_state[1], self.ch_state[2], self.ch_state[3]]))
+        ams_sync = b'\x2f\x2f\xff\xfe\x02' + self.channel_total.to_bytes(1, 'big')
+
+        for i in range(self.channel_total):
+            ams_sync += self.ch_state[i].to_bytes(1, 'big')
+
+        self.send_ams(ams_sync)
 
     def heartbeat(self):
         while self.is_running:

@@ -4,9 +4,8 @@ from typing import List
 from src.controller import ChannelAction, Controller
 import socket
 
-from src.utils.log import LOGD, LOGE, LOGI
+from src.utils.log import LOGE, LOGI
 
-CH_MAP = [1, 2, 3, 4]  # 通道映射表
 ams_head = b'\x2f\x2f\xff\xfe\x01\x02'
 
 
@@ -20,7 +19,7 @@ class YBAAMSController(Controller):
         self.ip: str = ip
         self.port: str = port
         self.sock: socket.socket = None
-        self.ch_state: List[int] = [0, 0, 0, 0]
+        self.ch_state: List[int] = [0] * channel_count
         self.thread: threading.Thread = None
         self.lock = threading.Lock()
 
@@ -100,13 +99,6 @@ class YBAAMSController(Controller):
         self.send_ams(ams_head + bytes([ch]) + bytes([fx]))
         self.ch_state[ch] = fx
 
-    # 查找耗材对应的通道
-    def find_channel(self, filament):
-        for i in range(len(CH_MAP)):
-            if CH_MAP[i] == filament:
-                return i
-        return -1
-
     def connect_to_server(self, server_ip, server_port):
         """尝试连接到服务器，并返回socket对象"""
         while True:
@@ -126,7 +118,7 @@ class YBAAMSController(Controller):
                 time.sleep(1)
             else:
                 for t in range(5):
-                    for i in range(4):
+                    for i in self.channel_total:
                         if not self.is_running:
                             break
                         self.ams_control(i, self.ch_state[i])  # 心跳+同步状态 先这样写，后面再改

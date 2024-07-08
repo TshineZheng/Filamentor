@@ -125,8 +125,8 @@ class AMSCore(TAGLOG):
 
         # 如果通道是主动送料，则启动时，开始送料
         c, i = self.channels[self.fila_cur]
-        if c.is_initiative_push(i):
-            self.driver_control(self.fila_cur, ChannelAction.PUSH)
+
+        self.driver_control(self.fila_cur, ChannelAction.PUSH if c.is_initiative_push(i) else ChannelAction.STOP)
 
         if first_filament != self.fila_cur:
             self.LOGI("打印的第一个通道不是AMS当前通道, 需要换色")

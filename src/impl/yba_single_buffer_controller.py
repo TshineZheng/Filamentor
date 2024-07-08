@@ -1,6 +1,5 @@
 from src.broken_detect import BrokenDetect
 from src.impl.yba_ams_py_controller import YBAAMSPYController
-from src.utils.log import LOGI
 
 ams_head = b'\x2f\x2f\xff\xfe\x01\x02'
 
@@ -52,6 +51,9 @@ class YBASingleBufferController(YBAAMSPYController):
             json_data["channel_total"],
             json_data["fila_broken_safe_time"]
         )
+
+    def is_initiative_push(self, channel_index: int) -> bool:
+        return False
 
 
 class YBABrokenDetect(BrokenDetect):

@@ -1,8 +1,7 @@
 ; ===== machine: Bambu A1 mini =============
-; ===== date: 20240708 =====================
-; ===== Filamentor V0.4 ====================
+; ===== date: 20240613 =====================
+; ===== Filamentor V0.3 ====================
 ; ===== Based on the official A1 mini change filament gcode (20231225)======
-; ===== 只适合被动送料的控制器, 比如: YBA-AMS-PY 单缓冲, 否则请使用主动送料的 gcode
 
 G392 S0
 M1007 S0
@@ -21,9 +20,6 @@ M106 P2 S0
 M104 S[old_filament_temp]
 {endif}
 
-G1 E-20 F200 ;Filament is pushed out 20 mm.
-M400 ;Waits until pushing out is completed before doing anything else.
-
 ; cut filament
 M17 S
 M17 X1.1
@@ -40,10 +36,6 @@ M73 L{layer_num+1} ; restore layer_num
 
 {if next_extruder < 255}
 M400
-
-G1 E18 F200 ;Filament is pushed back in 18 mm. 
-G1 E2 F20 ;Filament is pushed back in 2 mm but slower. 
-M400 ;Waits until pushing back in is completed before doing anything else
 
 G92 E0
 

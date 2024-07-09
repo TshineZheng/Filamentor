@@ -3,7 +3,9 @@ import ssl
 import time
 import paho.mqtt.client as mqtt
 
+from src import consts
 from src.broken_detect import BrokenDetect
+import src.utils.gcode_util as gcode_util
 from src.utils.json_util import ast
 from src.utils.log import LOGD, LOGE, LOGI, LOGW, TAGLOG
 from src.printer_client import Action, FilamentState, PrinterClient
@@ -84,6 +86,9 @@ class BambuClient(PrinterClient, TAGLOG):
         self.cur_layer = 0
         self.new_filament_temp = 0
         self.next_extruder = -1
+        self.change_count = 0
+        self.latest_home_change_count = 0
+        self.gcodeInfo = gcode_util.GCodeInfo()
 
         # self.trigger_pause = False
 
@@ -183,6 +188,8 @@ class BambuClient(PrinterClient, TAGLOG):
                             # self.trigger_pause = False
                             self.next_extruder = next_extruder
                             self.new_filament_temp = new_filament_temp
+                            self.change_count += 1
+
                             self.on_action(Action.CHANGE_FILAMENT, {
                                 'next_extruder': next_extruder,
                                 'next_filament_temp': self.new_filament_temp
@@ -212,9 +219,9 @@ class BambuClient(PrinterClient, TAGLOG):
                     p = json_data['print']['param']
                     url = json_data['print']['url']
                     subtask_name = json_data['print']['subtask_name']
-                    ci = BambuClient.get_first_fila_from_gcode(url, p)
+                    self.gcodeInfo = gcode_util.decodeFromZipUrl(url, p)
                     self.on_action(Action.TASK_START, {
-                        'first_filament': ci,
+                        'first_filament': self.gcodeInfo.first_channel,
                         'subtask_name': subtask_name
                     })
 
@@ -236,9 +243,40 @@ class BambuClient(PrinterClient, TAGLOG):
     def refresh_status(self):
         self.publish_status()
 
+    def fix_z(self, pre_tem):
+        cc = self.change_count - self.latest_home_change_count  # 计算距离上一次回中后换了几次色了
+
+        need_z_home = False
+
+        if consts.FIX_Z_PAUSE_COUNT == 0:  # 高度判断
+            z_height = cc * consts.PAUSE_Z_OFFSET + self.cur_layer * self.gcodeInfo.layer_height    # 计算当前z高度
+            LOGI(f'暂停次数:{self.change_count}, 抬高次数{cc}, 当前z高度{z_height}')
+            if z_height > consts.DO_HOME_Z_HEIGHT:  # 如果当前高度超过回中预设高度则回中
+                need_z_home = True
+        else:
+            if cc >= consts.FIX_Z_PAUSE_COUNT:  # 次数判断
+                need_z_home = True
+
+        if need_z_home:
+            LOGI('修复z高度')
+            if consts.FIX_Z_TEMP > 0:
+                self.publish_gcode(f'G1 E-28 F500\nM106 P1 S255\nM109 S{consts.FIX_Z_TEMP}\n' + consts.FIX_Z_GCODE + f'M106 P1 S0\nM109 S{pre_tem}\n')
+            else:
+                self.publish_gcode(f'G1 E-28 F500\nM106 P1 S255\nM400 S3\n' + consts.FIX_Z_GCODE + f'M106 P1 S0\nM109 S{pre_tem}\n')
+            self.latest_home_change_count = self.change_count
+            time.sleep(2)
+        else:
+            self.pull_filament(pre_tem)
+
     def on_unload(self, pre_tem=255):
         super().on_unload(pre_tem)
 
+        if consts.FIX_Z and consts.FIX_Z_GCODE:
+            self.fix_z(pre_tem)
+        else:
+            self.pull_filament(pre_tem)
+
+    def pull_filament(self, pre_tem=255):
         # 抽回一段距离，提前升温
         self.publish_gcode(
             f"""
@@ -246,7 +284,6 @@ class BambuClient(PrinterClient, TAGLOG):
             M109 S{pre_tem}
             """.replace('\n', '\\n')
         )
-
         time.sleep(2)
 
     def resume(self):
@@ -341,49 +378,6 @@ class BambuClient(PrinterClient, TAGLOG):
         self.publish_gcode(wipe_code)
         self.waiting_magic_command(MAGIC_AWAIT+1)
         self.LOGI('冲刷完成')
-
-    @staticmethod
-    def get_first_fila_from_gcode(zip_url: str, file_path: str) -> int:
-        import requests
-        import zipfile
-        import io
-
-        # 发送GET请求并获取ZIP文件的内容
-        response = requests.get(zip_url)
-
-        # 确保请求成功
-        if response.status_code == 200:
-            # 使用BytesIO读取下载的内容
-            zip_data = io.BytesIO(response.content)
-            # 使用zipfile读取ZIP文件
-            with zipfile.ZipFile(zip_data) as zip_file:
-                # 获取ZIP文件中的所有文件名列表
-                file_names = zip_file.namelist()
-                # 遍历文件名列表
-                for file_name in file_names:
-                    # 如果文件名符合您要查找的路径
-                    if file_path == file_name:
-                        # 打开文本文件
-                        with zip_file.open(file_name) as file:
-                            # 逐行读取文件内容
-                            for line in file:
-                                # 将bytes转换为str
-                                line_str = line.decode('utf-8')
-                                # 检查是否包含特定字符串
-                                if line_str.startswith('M620 S'):
-                                    # 找到匹配的行，返回内容
-                                    text = line_str.strip()
-                                    import re
-                                    # 正则表达式模式，用于匹配'M620 S'后面的数字，直到遇到非数字字符
-                                    pattern = r'M620 S(\d+)'
-                                    # 搜索匹配的内容
-                                    match = re.search(pattern, text)
-                                    # 如果找到匹配项，则提取数字
-                                    if match:
-                                        number = match.group(1)
-                                        print(number)  # 输出匹配到的数字
-                                        return int(int(number))
-        return -1
 
 
 class BambuBrokenDetect(BrokenDetect):

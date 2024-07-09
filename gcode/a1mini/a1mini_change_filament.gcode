@@ -1,7 +1,7 @@
 ; ===== machine: Bambu A1 mini =============
 ; ===== date: 20240708 =====================
 ; ===== Filamentor V0.4 ====================
-; ===== Based on the official A1 mini change filament gcode (20231225)======
+; ===== Based on the official A1 mini change filament gcode (20240618)======
 ; ===== 只适合被动送料的控制器, 比如: YBA-AMS-PY 单缓冲, 否则请使用主动送料的 gcode
 
 G392 S0
@@ -202,6 +202,7 @@ G1 X-13.5 F3000
 G1 X-3.5 F18000
 G1 X-13.5 F3000
 G1 X-3.5 F18000
+G1 X-13.5 F3000
 M400
 G1 Z{max_layer_z + 3.0} F3000
 M106 P1 S0

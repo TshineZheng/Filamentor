@@ -88,7 +88,7 @@ class BambuClient(PrinterClient, TAGLOG):
         self.next_extruder = -1
         self.change_count = 0
         self.latest_home_change_count = 0
-        self.gcodeInfo = None
+        self.gcodeInfo = gcode_util.GCodeInfo()
 
         # self.trigger_pause = False
 
@@ -271,7 +271,7 @@ class BambuClient(PrinterClient, TAGLOG):
     def on_unload(self, pre_tem=255):
         super().on_unload(pre_tem)
 
-        if consts.FIX_Z_GCODE:
+        if consts.FIX_Z and consts.FIX_Z_GCODE:
             self.fix_z(pre_tem)
         else:
             self.pull_filament(pre_tem)

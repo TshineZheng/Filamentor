@@ -78,6 +78,9 @@ class BambuClient(PrinterClient, TAGLOG):
 
         self.clean()
 
+    def isPrinting(self):
+        return self.print_status == 'PAUSE' or self.print_status == 'RUNNING'
+
     def clean(self):
         self.wating_pause_flag = False
         self.mc_percent = 0
@@ -89,6 +92,7 @@ class BambuClient(PrinterClient, TAGLOG):
         self.change_count = 0
         self.latest_home_change_count = 0
         self.gcodeInfo = gcode_util.GCodeInfo()
+        self.print_status = 'unkonw'
 
         # self.trigger_pause = False
 
@@ -171,6 +175,9 @@ class BambuClient(PrinterClient, TAGLOG):
             return
 
         json_print = json_data["print"]
+
+        if 'gcode_state' in json_print:
+            self.print_status = json_print["gcode_state"]
 
         if 'layer_num' in json_print:
             layer_num = json_print["layer_num"]

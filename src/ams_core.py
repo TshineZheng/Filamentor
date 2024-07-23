@@ -175,7 +175,7 @@ class AMSCore(TAGLOG):
         self.printer_client.remove_on_action(self.on_printer_action)
 
     def hasTask(self):
-        return self.task_name is not None and self.task_name != ''
+        return self.printer_client.isPrinting()
 
     def run_filament_change(self, next_filament: int, next_filament_temp: int, before_done: Callable = None):
         if self.fila_changing:

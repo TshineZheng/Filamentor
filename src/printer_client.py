@@ -90,6 +90,15 @@ class PrinterClient(BaseUnit):
         pass
 
     @abstractmethod
+    def isPrinting(self) -> bool:
+        """是否正在打印
+
+        Returns:
+            bool: 是否正在打印
+        """
+        pass
+
+    @abstractmethod
     def to_dict(self) -> dict:
         """输出打印机的相关配置
         """

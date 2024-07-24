@@ -135,7 +135,7 @@ class AMSCore(TAGLOG):
             #     args=(self, first_filament, self.change_tem)).start()
 
     def __on_task_stopped(self, task_name: str, action: printer.Action):
-        if self.task_name == task_name:
+        if self.task_log_id:
             self.LOGI(f"{self.task_name} {'打印完成' if action == printer.Action.TASK_FINISH else '打印失败'}")
             self.task_name = None
             self.stop_task_log()

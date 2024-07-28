@@ -26,8 +26,9 @@ Filamentor = Filament + mentor，这是一个3D打印机进退料管理系统（
 
 # 使用
 1. 首先在 gcode 目录下找到对应的 gcode，替换到 `BambuStudio` > `打印机设置` > `打印机G-code` > `耗材丝更新G-code`
-2. 双击 `start.bat` 启动程序，确保无错误提示。
-3. 如果需要配置，访问启动时提示的链接。
+2. 安装[python](https://www.python.org/downloads/release/python-3124/) ,并确保环境配置正常。
+4. 双击 `start.bat` 启动程序，确保无错误提示。
+5. 如果需要配置，访问启动时提示的链接。
 
 ### 关于暂停抬高问题
 目前（2024-07-08）拓竹 a 系列每次换料暂停会导致 z 轴越升越高，直至撞顶，此问题已反馈给官方，并确认为BUG，等待新固件修复。

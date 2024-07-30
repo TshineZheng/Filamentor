@@ -277,6 +277,9 @@ class AMSCore(TAGLOG):
             before_done()
 
         self.printer_client.resume()
+
+        time.sleep(1)
+
         self.LOGI("恢复打印")
 
         self.on_resumed()

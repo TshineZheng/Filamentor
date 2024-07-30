@@ -295,6 +295,7 @@ class BambuClient(PrinterClient, TAGLOG):
 
     def resume(self):
         super().resume()
+        self.publish_gcode('G1 E1 F500\n')    # 夹紧耗材
         self.publish_resume()
         self.publish_clear()
         self.publish_status()

@@ -30,6 +30,7 @@ class AMSCore(TAGLOG):
         self.task_name = None
         self.task_log_id = None
         self.printer_fila_state = printer.FilamentState.UNKNOWN
+        self.isTaskStoped = False
 
         self.printer_client = config.get_printer(use_printer)
         self.change_tem = config.get_printer_change_tem(use_printer)
@@ -120,6 +121,7 @@ class AMSCore(TAGLOG):
             self.__on_task_stopped(data, action)
 
     def __on_task_started(self, task_name: str, first_filament: int):
+        self.isTaskStoped = False
         self.task_name = task_name
         self.change_count = 0   # 重置换色次数
         self.start_task_log()   # 开始记录打印日志
@@ -142,12 +144,14 @@ class AMSCore(TAGLOG):
             #     args=(self, first_filament, self.change_tem)).start()
 
     def __on_task_stopped(self, task_name: str, action: printer.Action):
+        self.isTaskStoped = True
+        for c, i in self.channels:
+            c.control(i, ChannelAction.STOP)
+
         if self.task_log_id:
             self.LOGI(f"{self.task_name} {'打印完成' if action == printer.Action.TASK_FINISH else '打印失败'}")
             self.task_name = None
             self.stop_task_log()
-            for c, i in self.channels:
-                c.control(i, ChannelAction.STOP)
 
     def start_task_log(self):
         from loguru import logger as LOG
@@ -222,19 +226,22 @@ class AMSCore(TAGLOG):
 
         # 等待打印机小绿点消失，如果超过一定时间，估计是卡五通了
         ts = datetime.now().timestamp()
-        while self.printer_fila_state != printer.FilamentState.YES:
+        while self.printer_fila_state != printer.FilamentState.YES and not self.isTaskStoped:
             if datetime.now().timestamp() - ts > PRINTER_UNLOAD_TIMEOUT:
                 self.printer_client.refresh_status()
                 self.LOGI(f"打印机退料卡头了？都{PRINTER_UNLOAD_TIMEOUT}秒了，小绿点还没消失，抖一下")
                 self.fila_shake(self.fila_next, ChannelAction.PULL)
                 ts = datetime.now().timestamp()
 
+        if self.isTaskStoped:
+            return
+
         self.LOGI("打印机退料完成")
 
         ts = datetime.now().timestamp()
         max_pull_time = ts + UNLOAD_WARNING    # 最大退料时间，如果超出这个时间，则提醒用户
         # 等待所有断料检测器都没有料
-        while not self.is_filament_broken(self.fila_cur):
+        while not self.is_filament_broken(self.fila_cur) and not self.isTaskStoped:
             time.sleep(2)
             if datetime.now().timestamp() - ts > UNLOAD_TIMEOUT:
                 self.LOGI("退料超时，抖一抖")
@@ -244,6 +251,9 @@ class AMSCore(TAGLOG):
             if max_pull_time < datetime.now().timestamp():
                 self.LOGI("退不出来，摇人吧（需要手动把料撤回）")
                 # TODO: 发出警报
+
+        if self.isTaskStoped:
+            return
 
         self.LOGI("退料检测到位")
         safe_time = self.get_pull_safe_time(self.fila_cur)
@@ -265,7 +275,7 @@ class AMSCore(TAGLOG):
         max_push_time = ts + LOAD_WARNING    # 最大送料时间，如果超出这个时间，则提醒用户
 
         # 到料目前还只能通过打印机判断，只能等了，不断刷新
-        while self.printer_fila_state != printer.FilamentState.YES:    # 等待打印机料线到达
+        while self.printer_fila_state != printer.FilamentState.YES and not self.isTaskStoped:    # 等待打印机料线到达
             if datetime.now().timestamp() - ts > LOAD_TIMEOUT:
                 self.LOGI("送料超时，抖一抖")
                 self.fila_shake(self.fila_next, ChannelAction.PUSH)
@@ -277,6 +287,9 @@ class AMSCore(TAGLOG):
 
             self.printer_client.refresh_status()    # 刷新打印机状态
             time.sleep(2)
+
+        if self.isTaskStoped:
+            return
 
         self.update_cur_fila(self.fila_next)
         self.LOGI("料线到达，换色完成")

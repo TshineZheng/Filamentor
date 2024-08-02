@@ -10,6 +10,7 @@ from src.utils.log import LOGE
 class ChannelAction(Enum):
     """控制类型
     """
+    NONE = -1  # 待机（根据控制器类型自动判断是松开还是送料）
     PUSH = 1  # 送
     PULL = 2  # 退
     STOP = 0  # 停（也可以是松）

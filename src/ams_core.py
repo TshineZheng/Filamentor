@@ -52,16 +52,23 @@ class AMSCore(TAGLOG):
     def tag(self):
         return self.use_printer
 
-    def driver_control(self, printer_ch: int, action: ChannelAction):
+    def driver_control(self, printer_ch: int, action: ChannelAction = ChannelAction.NONE):
+        """控制通道
+
+        Args:
+            printer_ch (int): 打印机通道
+            action (ChannelAction, optional): 通道动作, 如果动作为ChannelAction.NONE, 则自动根据控制器类型设置默认状态. Defaults to ChannelAction.NONE.
+        """
         c, i = self.channels[printer_ch]
+
+        if action == ChannelAction.NONE:
+            action = ChannelAction.PUSH if c.is_initiative_push(i) else ChannelAction.STOP
+
         c.control(i, action)
         self.LOGD(f'{action} {printer_ch} ({c.type_name()} {i})')
 
     def on_resumed(self):
-        c, i = self.channels[self.fila_cur]
-        # 非主动送料的通道，直接松开
-        if not c.is_initiative_push(i):
-            c.control(i, ChannelAction.STOP)
+        self.driver_control(self.fila_cur, ChannelAction.NONE)
 
     def is_filament_broken(self, printer_ch: int) -> bool:
         """当所有断料检测器都没有料时，返回 True
@@ -217,6 +224,7 @@ class AMSCore(TAGLOG):
         ts = datetime.now().timestamp()
         while self.printer_fila_state != printer.FilamentState.YES:
             if datetime.now().timestamp() - ts > PRINTER_UNLOAD_TIMEOUT:
+                self.printer_client.refresh_status()
                 self.LOGI(f"打印机退料卡头了？都{PRINTER_UNLOAD_TIMEOUT}秒了，小绿点还没消失，抖一下")
                 self.fila_shake(self.fila_next, ChannelAction.PULL)
                 ts = datetime.now().timestamp()

@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends
+from src.controller import ChannelAction
 from src.printer_client import PrinterClient
+from src.web.controller.dependencies import valid_channel_action
 from src.web.printer.dependencies import valid_ams_printer_task, valid_printer_channel, valid_printer_id_exist, valid_printer_taken
 import src.web.printer.service as service
 
@@ -24,7 +26,8 @@ async def delete_printer(
 async def set_channel(
         printer_id: str = Depends(valid_printer_id_exist),
         printer_channel: int = Depends(valid_printer_channel)):
-    await service.update_printer_channel(printer_id, printer_channel)
+    # await service.update_printer_channel(printer_id, printer_channel)
+    await service.channel_control(printer_id, printer_channel, ChannelAction.NONE)
 
 
 @ router.post('/set_change_temp')
@@ -43,3 +46,12 @@ async def edit_channel_filament_setting(
     printer_channel: int = Depends(valid_printer_channel),
 ):
     await service.edit_channel_filament_setting(printer_id, printer_channel, filament_type, filament_color)
+
+
+@router.post('/channel_control', dependencies=[Depends(valid_ams_printer_task)])
+async def channel_control(
+    printer_id: str = Depends(valid_printer_id_exist),
+    printer_channel: int = Depends(valid_printer_channel),
+    action: ChannelAction = Depends(valid_channel_action),
+):
+    await service.channel_control(printer_id, printer_channel, action)

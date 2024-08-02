@@ -146,8 +146,8 @@ class AMSCore(TAGLOG):
             self.LOGI(f"{self.task_name} {'打印完成' if action == printer.Action.TASK_FINISH else '打印失败'}")
             self.task_name = None
             self.stop_task_log()
-            c, i = self.channels[self.fila_cur]
-            c.control(i, ChannelAction.STOP)
+            for c, i in self.channels:
+                c.control(i, ChannelAction.STOP)
 
     def start_task_log(self):
         from loguru import logger as LOG

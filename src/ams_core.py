@@ -203,6 +203,9 @@ class AMSCore(TAGLOG):
     def filament_change(self, next_filament: int, next_filament_temp: int, before_done: Callable = None):
         # FIXME: 要增加通道不匹配的判断，比如接到换第4通道，结果我们只有3通道，可以呼叫用户确认，再继续
 
+        if self.isTaskStoped:
+            return
+
         self.change_count += 1
         self.fila_next = next_filament
 

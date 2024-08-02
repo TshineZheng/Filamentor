@@ -36,6 +36,9 @@ class YBASingleBufferController(YBAAMSPYController):
 
     def connect(self):
         super().connect()
+        self.refresh_fila_broken()
+
+    def refresh_fila_broken(self):
         self.send_ams(b'\x2f\x2f\xff\xfe\xfd')
 
     def to_dict(self) -> dict:
@@ -70,6 +73,7 @@ class YBABrokenDetect(BrokenDetect):
         return self.parent.fila_broken_safe_time
 
     def is_filament_broken(self) -> bool:
+        self.parent.refresh_fila_broken()
         return self.parent.is_fila_broken
 
     def to_dict(self) -> dict:

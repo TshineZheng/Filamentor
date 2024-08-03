@@ -12,6 +12,9 @@ async def startup_event():
     import src.consts as consts
     import src.core_services as core_services
     import src.web.front as front
+    from dotenv import load_dotenv
+
+    load_dotenv()
 
     logger.remove(0)
     logger.add(sys.stderr, level="INFO")

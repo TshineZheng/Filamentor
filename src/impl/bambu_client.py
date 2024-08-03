@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 import ssl
 import time
@@ -111,6 +112,16 @@ class BambuClient(PrinterClient, TAGLOG):
             'lan_password': self.config.lan_password,
             'device_serial': self.config.device_serial
         }
+
+    def publish_gcode_await(self, gcode):
+        save_percent = self.mc_percent
+        self.publish_gcode(f'{gcode}\nM400\nM73 P101\n')
+        ts = 0
+        while self.mc_percent != 101:
+            if ts < datetime.now().timestamp():
+                self.publish_status()
+                ts = datetime.now().timestamp() + 0.2
+        self.publish_gcode(f'M73 P{save_percent}\n')
 
     def publish_gcode(self, g_code):
         operation_code = '{"print": {"sequence_id": "1", "command": "gcode_line", "param": "' + g_code + '"},"user_id":"1"}'
@@ -265,11 +276,10 @@ class BambuClient(PrinterClient, TAGLOG):
         if need_z_home:
             LOGI('修复z高度')
             if consts.FIX_Z_TEMP > 0:
-                self.publish_gcode(f'G1 E-28 F500\nM106 P1 S255\nM109 S{consts.FIX_Z_TEMP}\n' + consts.FIX_Z_GCODE + f'M106 P1 S0\nM109 S{pre_tem}\n')
+                self.publish_gcode_await(f'G1 E-28 F500\nM106 P1 S255\nM109 S{consts.FIX_Z_TEMP}\n' + consts.FIX_Z_GCODE + f'M106 P1 S0\nM109 S{pre_tem}\n')
             else:
-                self.publish_gcode(f'G1 E-28 F500\nM106 P1 S255\nM400 S3\n' + consts.FIX_Z_GCODE + f'M106 P1 S0\nM109 S{pre_tem}\n')
+                self.publish_gcode_await(f'G1 E-28 F500\nM106 P1 S255\nM400 S3\n' + consts.FIX_Z_GCODE + f'M106 P1 S0\nM109 S{pre_tem}\n')
             self.latest_home_change_count = self.change_count
-            time.sleep(2)
         else:
             self.pull_filament(pre_tem)
 
@@ -283,18 +293,16 @@ class BambuClient(PrinterClient, TAGLOG):
 
     def pull_filament(self, pre_tem=255):
         # 抽回一段距离，提前升温
-        self.publish_gcode(
+        self.publish_gcode_await(
             f"""
             G1 E-28 F500
             M109 S{pre_tem}
             """.replace('\n', '\\n')
         )
-        time.sleep(2)
 
     def resume(self):
         super().resume()
-        self.publish_gcode('G1 E1 F500\n')    # 夹紧耗材
-        time.sleep(1)
+        self.publish_gcode_await('G1 E1 F500\n')    # 夹紧耗材
         self.publish_resume()
         self.publish_clear()
         self.publish_status()
@@ -314,77 +322,6 @@ class BambuClient(PrinterClient, TAGLOG):
 
     def filament_broken_detect(self) -> BrokenDetect:
         return self.fbd
-
-    def waiting_pause(self):
-        self.waiing_199_flag = False
-        while not self.wating_pause_flag:
-            self.publish_status()
-            time.sleep(1)
-
-    def waiting_magic_command(self, magic_code: int):
-        while not self.magic_command == magic_code:
-            self.publish_status()
-            time.sleep(1)
-        self.LOGD(f'magic command {magic_code} received')
-
-    def change_filament(self, ams, next_fila: int, change_temp: int = 255):
-        # time.sleep(10)
-        # self.LOGI('发送暂停指令')
-        self.publish_pause()    # 先让打印机暂停
-
-        self.waiting_pause()    # 等待打印机暂停
-
-        self.LOGI('已暂停')
-
-        self.LOGI('开始切料')
-
-        # 执行切料
-        cut_code = f"""
-            M106 P1 S0
-            M106 P2 S0
-            M109 S{change_temp}
-
-            ; cut filament
-            M17 S
-            M17 X1.1
-            G1 X180 F18000
-            G1 X201 F1000
-            G1 E-2 F500
-            G1 X180 F3000
-            G1 X-13.5 F18000
-            M17 R
-
-            M400
-
-            M73 M73 L{MAGIC_AWAIT}
-        """.replace('\n', '\\n')
-        self.publish_gcode(cut_code)
-        self.waiting_magic_command(MAGIC_AWAIT)
-
-        self.LOGI('切料完成')
-
-        ams.run_filament_change(next_fila, self.__change_fila_swip())
-
-    def __change_fila_swip(self):
-        self.LOGI('开始冲刷')
-        filament_e_feedrate = 224
-        new_filament_temp = 255
-        wipe_code = f"""
-            M109 S{new_filament_temp}
-            M106 P1 S60
-
-            G1 E35 F{filament_e_feedrate}
-
-            G1 E-2 F1800
-            G1 E2 F300
-
-            M400
-
-            M73 M73 L{MAGIC_AWAIT+1}
-        """.replace('\n', '\\n')
-        self.publish_gcode(wipe_code)
-        self.waiting_magic_command(MAGIC_AWAIT+1)
-        self.LOGI('冲刷完成')
 
 
 class BambuBrokenDetect(BrokenDetect):

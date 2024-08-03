@@ -64,17 +64,6 @@ class PrinterClient(BaseUnit):
         pass
 
     @abstractmethod
-    def change_filament(self, ams, next_fila: int, change_temp: int = 255):
-        """打印机退料
-
-        Args:
-            ams (AMSCore): ams控制，在打印机退料时，可能需要控制ams动作，比如说回抽，送料等等
-            next_fila (int): 下一个通道
-            change_temp (int, optional): 换色温度. Defaults to 255.
-        """
-        pass
-
-    @abstractmethod
     def refresh_status(self):
         """刷新打印机状态，通过 on action 回调数据
         """

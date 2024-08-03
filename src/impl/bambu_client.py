@@ -177,7 +177,22 @@ class BambuClient(PrinterClient, TAGLOG):
         json_print = json_data["print"]
 
         if 'gcode_state' in json_print:
-            self.print_status = json_print["gcode_state"]
+            gcode_state = json_print["gcode_state"]
+
+            if gcode_state != self.print_status:
+                self.print_status = gcode_state
+                if 'PAUSE' == gcode_state:
+                    self.wating_pause_flag = True
+                if 'FINISH' == gcode_state:
+                    if self.mc_percent == 100 and 'subtask_name' in json_print:
+                        self.on_action(Action.TASK_FINISH, json_print['subtask_name'])
+                        self.clean()
+
+                if 'FAILED' == gcode_state:
+                    if ast(json_print, 'print_error', 50348044):
+                        if 'subtask_name' in json_print:
+                            self.on_action(Action.TASK_FAILED, json_print['subtask_name'])
+                            self.clean()
 
         if 'layer_num' in json_print:
             layer_num = json_print["layer_num"]
@@ -231,21 +246,6 @@ class BambuClient(PrinterClient, TAGLOG):
                         'first_filament': self.gcodeInfo.first_channel,
                         'subtask_name': subtask_name
                     })
-
-        if "gcode_state" in json_print:
-            gcode_state = json_print["gcode_state"]
-            if 'PAUSE' == gcode_state:
-                self.wating_pause_flag = True
-            if 'FINISH' == gcode_state:
-                if self.mc_percent == 100 and 'subtask_name' in json_print:
-                    self.on_action(Action.TASK_FINISH, json_print['subtask_name'])
-                    self.clean()
-
-            if 'FAILED' == gcode_state:
-                if ast(json_print, 'print_error', 50348044):
-                    if 'subtask_name' in json_print:
-                        self.on_action(Action.TASK_FAILED, json_print['subtask_name'])
-                        self.clean()
 
     def refresh_status(self):
         self.publish_status()

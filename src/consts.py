@@ -31,16 +31,17 @@ def setup():
     fix_z_gcode_path = os.getenv("FIX_Z_GCODE")
 
     if FIX_Z and fix_z_gcode_path:
-        print('FIX_Z_TEMP:', FIX_Z_TEMP)
-        print('FIX_Z_PAUSE_COUNT:', FIX_Z_PAUSE_COUNT)
-        print('PAUSE_Z_OFFSET:', PAUSE_Z_OFFSET)
-        print('DO_HOME_Z_HEIGHT:', DO_HOME_Z_HEIGHT)
-        print('LAYER_HEIGHT:', LAYER_HEIGHT)
-        print(f'Z 轴抬高 gcode 文件路径为：{fix_z_gcode_path}')
+        from src.utils.log import LOGI, LOGE
+        LOGI('FIX_Z_TEMP:', FIX_Z_TEMP)
+        LOGI('FIX_Z_PAUSE_COUNT:', FIX_Z_PAUSE_COUNT)
+        LOGI('PAUSE_Z_OFFSET:', PAUSE_Z_OFFSET)
+        LOGI('DO_HOME_Z_HEIGHT:', DO_HOME_Z_HEIGHT)
+        LOGI('LAYER_HEIGHT:', LAYER_HEIGHT)
+        LOGI(f'Z 轴抬高 gcode 文件路径为：{fix_z_gcode_path}')
         try:
             with open(fix_z_gcode_path, 'r') as f:
                 FIX_Z_GCODE = f.read().replace('\n', '\\n')
-                print('修复 Z 轴抬高 gcode 读取成功')
+                LOGI('修复 Z 轴抬高 gcode 读取成功')
         except Exception as e:
-            print(f'修复 Z 轴抬高文件读取失败：{fix_z_gcode_path}')
-            print(e)
+            LOGE(f'修复 Z 轴抬高文件读取失败：{fix_z_gcode_path}')
+            LOGE(e)

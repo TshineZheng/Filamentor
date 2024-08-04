@@ -287,6 +287,7 @@ class AMSCore(TAGLOG):
 
             if max_push_time < datetime.now().timestamp():
                 self.LOGI("送不进去，摇人吧（需要手动把料送进去）")
+                time.sleep(2)
                 # TODO: 发出警报
             elif datetime.now().timestamp() - ts > LOAD_TIMEOUT:
                 self.LOGI("送料超时，抖一抖")

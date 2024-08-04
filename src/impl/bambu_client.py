@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+import os
 import ssl
 import time
 import paho.mqtt.client as mqtt
@@ -79,6 +80,14 @@ class BambuClient(PrinterClient, TAGLOG):
 
         self.clean()
 
+        self.read_env()
+
+    def read_env(self):
+        self.change_count = int(os.getenv("CHANGE_COUNT", '0'))
+        self.latest_home_change_count = int(os.getenv("LATEST_HOME_CHANGE_COUNT", '0'))
+        LOGI(f'CHANGE_COUNT: {self.change_count}')
+        LOGI(f'LATEST_HOME_CHANGE_COUNT: {self.latest_home_change_count}')
+
     def isPrinting(self):
         return self.print_status == 'PAUSE' or self.print_status == 'RUNNING'
 
@@ -120,7 +129,7 @@ class BambuClient(PrinterClient, TAGLOG):
         while self.mc_percent != 101:
             if ts < datetime.now().timestamp():
                 self.publish_status()
-                ts = datetime.now().timestamp() + 0.2
+                ts = datetime.now().timestamp() + 0.5
         self.publish_gcode(f'M73 P{save_percent}\n')
 
     def publish_gcode(self, g_code):
@@ -274,11 +283,13 @@ class BambuClient(PrinterClient, TAGLOG):
                 need_z_home = True
 
         if need_z_home:
+            upz = f'G1 Z{self.cur_layer * self.gcodeInfo.layer_height + 2} F500\n'
             LOGI('修复z高度')
             if consts.FIX_Z_TEMP > 0:
-                self.publish_gcode_await(f'G1 E-28 F500\nM106 P1 S255\nM109 S{consts.FIX_Z_TEMP}\n' + consts.FIX_Z_GCODE + f'M106 P1 S0\nM109 S{pre_tem}\n')
+                self.publish_gcode_await(f'G1 E-28 F500\nM106 P1 S255\nM109 S{consts.FIX_Z_TEMP}\n' +
+                                         consts.FIX_Z_GCODE + f'M106 P1 S0\nM109 S{pre_tem}\n' + upz)
             else:
-                self.publish_gcode_await(f'G1 E-28 F500\nM106 P1 S255\nM400 S3\n' + consts.FIX_Z_GCODE + f'M106 P1 S0\nM109 S{pre_tem}\n')
+                self.publish_gcode_await(f'G1 E-28 F500\nM106 P1 S255\nM400 S3\n' + consts.FIX_Z_GCODE + f'M106 P1 S0\nM109 S{pre_tem}\n' + upz)
             self.latest_home_change_count = self.change_count
         else:
             self.pull_filament(pre_tem)

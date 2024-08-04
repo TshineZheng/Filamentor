@@ -283,13 +283,13 @@ class BambuClient(PrinterClient, TAGLOG):
                 need_z_home = True
 
         if need_z_home:
-            upz = f'G1 Z{self.cur_layer * self.gcodeInfo.layer_height + 2} F500\n'
+            upz = f'G1 Z{self.cur_layer * self.gcodeInfo.layer_height + 2} F30000\n'
             LOGI('修复z高度')
             if consts.FIX_Z_TEMP > 0:
                 self.publish_gcode_await(f'G1 E-28 F500\nM106 P1 S255\nM109 S{consts.FIX_Z_TEMP}\n' +
-                                         consts.FIX_Z_GCODE + f'M106 P1 S0\nM109 S{pre_tem}\n' + upz)
+                                         consts.FIX_Z_GCODE + upz + f'M106 P1 S0\nM109 S{pre_tem}\n')
             else:
-                self.publish_gcode_await(f'G1 E-28 F500\nM106 P1 S255\nM400 S3\n' + consts.FIX_Z_GCODE + f'M106 P1 S0\nM109 S{pre_tem}\n' + upz)
+                self.publish_gcode_await(f'G1 E-28 F500\nM106 P1 S255\nM400 S3\n' + consts.FIX_Z_GCODE + upz + f'M106 P1 S0\nM109 S{pre_tem}\n')
             self.latest_home_change_count = self.change_count
         else:
             self.pull_filament(pre_tem)
@@ -313,7 +313,7 @@ class BambuClient(PrinterClient, TAGLOG):
 
     def resume(self):
         super().resume()
-        self.publish_gcode_await('G1 E1 F500\n')    # 夹紧耗材
+        self.publish_gcode_await('M83\nG1 E2 F500\n')    # 夹紧耗材
         self.publish_resume()
         self.publish_clear()
         self.publish_status()

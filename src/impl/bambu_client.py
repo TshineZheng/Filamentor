@@ -97,7 +97,8 @@ class BambuClient(PrinterClient, TAGLOG):
         self.mc_remaining_time = 0
         self.magic_command = 0
         self.cur_layer = 0
-        self.new_filament_temp = 0
+        self.new_fila_temp = 0
+        self.pre_fila_temp = 0
         self.next_extruder = -1
         self.change_count = 0
         self.latest_home_change_count = 0
@@ -253,13 +254,18 @@ class BambuClient(PrinterClient, TAGLOG):
                     if ast(json_print, 'gcode_state', 'PAUSE'):  # 暂停状态
                         # self.trigger_pause = False
                         self.next_extruder = next_extruder
-                        self.new_filament_temp = new_filament_temp
+                        self.new_fila_temp = new_filament_temp
                         self.change_count += 1
 
+                        # FIXME: 这里实际上应该是当前耗材温度，而不是新耗材温度
+                        # 因为恢复暂停时会自动恢复之前的温度，所以这里的温度操作，实际上是为了维持温度，避免因为暂停导致温度暂停
+                        # 而且换料后，有一小断耗材还在打印头上，需要挤出，也需要维持之前的温度
                         self.on_action(Action.CHANGE_FILAMENT, {
                             'next_extruder': next_extruder,
-                            'next_filament_temp': self.new_filament_temp
+                            'next_filament_temp': self.pre_fila_temp if self.pre_fila_temp > 0 else new_filament_temp
                         })
+
+                        self.pre_fila_temp = new_filament_temp
                     else:
                         self.publish_status()
             else:

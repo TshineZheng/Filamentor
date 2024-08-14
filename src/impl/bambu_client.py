@@ -62,7 +62,7 @@ class BambuClient(PrinterClient, TAGLOG):
         self.TOPIC_SUBSCRIBE = f"device/{config.device_serial}/report"
         self.TOPIC_PUBLISH = f"device/{config.device_serial}/request"
 
-        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=BAMBU_CLIENT_ID)
+        client = mqtt.Client(client_id=BAMBU_CLIENT_ID)
         # 设置TLS
         # 如果服务器使用自签名证书，请使用ssl.CERT_NONE
         client.tls_set(cert_reqs=ssl.CERT_NONE)
@@ -122,9 +122,9 @@ class BambuClient(PrinterClient, TAGLOG):
             'device_serial': self.config.device_serial
         }
 
-    def publish_gcode_await(self, gcode):
+    def publish_gcode_await(self, gcode, after_gcode):
         save_percent = self.mc_percent
-        self.publish_gcode(f'{gcode}\nM400\nM73 P101\n')
+        self.publish_gcode(f'{gcode}\nM400\nM73 P101\n{after_gcode if after_gcode else ""}\n')
         ts = 0
         while self.mc_percent != 101:
             if ts < datetime.now().timestamp():
@@ -149,7 +149,7 @@ class BambuClient(PrinterClient, TAGLOG):
         self.client.publish(self.TOPIC_PUBLISH, bambu_pause)
 
     # noinspection PyUnusedLocal
-    def on_connect(self, client, userdata, flags, rc, properties):
+    def on_connect(self, client, userdata, flags, rc):
         if rc == 0:
             LOGI("连接竹子成功")
             # 连接成功后订阅主题
@@ -283,13 +283,13 @@ class BambuClient(PrinterClient, TAGLOG):
                 need_z_home = True
 
         if need_z_home:
-            upz = f'G1 Z{self.cur_layer * self.gcodeInfo.layer_height + 2} F30000\n'
+            upz = f'G1 Z{self.cur_layer * self.gcodeInfo.layer_height + 2} F30000'
             LOGI('修复z高度')
             if consts.FIX_Z_TEMP > 0:
-                self.publish_gcode_await(f'G1 E-28 F500\nM106 P1 S255\nM109 S{consts.FIX_Z_TEMP}\n' +
-                                         consts.FIX_Z_GCODE + upz + f'M106 P1 S0\nM109 S{pre_tem}\n')
+                self.publish_gcode_await(
+                    f'G1 E-28 F500\nM106 P1 S255\nM109 S{consts.FIX_Z_TEMP}\n{consts.FIX_Z_GCODE}\n{upz}\n', after_gcode=f'M106 P1 S0\nM109 S{pre_tem}\n')
             else:
-                self.publish_gcode_await(f'G1 E-28 F500\nM106 P1 S255\nM400 S3\n' + consts.FIX_Z_GCODE + upz + f'M106 P1 S0\nM109 S{pre_tem}\n')
+                self.publish_gcode_await(f'G1 E-28 F500\nM106 P1 S255\nM400 S3\n{consts.FIX_Z_GCODE}\n{upz}\n', after_gcode=f'M106 P1 S0\nM109 S{pre_tem}\n')
             self.latest_home_change_count = self.change_count
         else:
             self.pull_filament(pre_tem)
@@ -304,12 +304,7 @@ class BambuClient(PrinterClient, TAGLOG):
 
     def pull_filament(self, pre_tem=255):
         # 抽回一段距离，提前升温
-        self.publish_gcode_await(
-            f"""
-            G1 E-28 F500
-            M109 S{pre_tem}
-            """.replace('\n', '\\n')
-        )
+        self.publish_gcode_await('G1 E-28 F500\n', f'M109 S{pre_tem}\n')
 
     def resume(self):
         super().resume()
@@ -345,7 +340,7 @@ class BambuBrokenDetect(BrokenDetect):
         self.fila_state = FilamentState.UNKNOWN
 
     def is_filament_broken(self) -> bool:
-        self.bambu_client.refresh_status()
+        self.bambu_client.refresh_status()  # FIXME: 这里不应该不断刷新
         return FilamentState.NO == self.fila_state
 
     def get_safe_time(self) -> float:

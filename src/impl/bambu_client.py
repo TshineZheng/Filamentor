@@ -122,7 +122,7 @@ class BambuClient(PrinterClient, TAGLOG):
             'device_serial': self.config.device_serial
         }
 
-    def publish_gcode_await(self, gcode, after_gcode):
+    def publish_gcode_await(self, gcode, after_gcode=None):
         save_percent = self.mc_percent
         self.publish_gcode(f'{gcode}\nM400\nM73 P101\n{after_gcode if after_gcode else ""}\n')
         ts = 0

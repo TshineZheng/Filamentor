@@ -192,7 +192,7 @@ class AppConfig():
                 data = json.load(f)
                 self.load_from_dict(data)
         except Exception as e:
-            LOGE("读取配置文件失败", e)
+            LOGE(f"读取配置文件失败{e}")
             pass
 
     def to_dict(self):

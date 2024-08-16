@@ -1,5 +1,9 @@
 ; 这是 A1Mini 通过回中来修复暂停后 z 轴抬高问题的 gcode, 请参看 .env 文件中的相关介绍
 
+M106 P1 S255
+M109 S200 ; cool down
+; M400 S3 ; or just wait
+
 G90
 G1 X-13.5 F18000 ; back to the toilet
 
@@ -78,3 +82,4 @@ G29.2 S0 ; turn off ABL
 
 G1 X-13.5 F18000 ; back to the toilet
 
+M106 P1 S0

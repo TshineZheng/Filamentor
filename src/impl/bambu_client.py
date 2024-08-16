@@ -276,11 +276,10 @@ class BambuClient(PrinterClient, TAGLOG):
 
     def fix_z(self, pre_tem):
         cc = self.change_count - self.latest_home_change_count  # 计算距离上一次回中后换了几次色了
-
+        modle_z = self.cur_layer * self.gcodeInfo.layer_height  # 当前模型已经打印了多高
         need_z_home = False
-
         if consts.FIX_Z_PAUSE_COUNT == 0:  # 高度判断
-            z_height = cc * consts.PAUSE_Z_OFFSET + self.cur_layer * self.gcodeInfo.layer_height    # 计算当前z高度
+            z_height = cc * consts.PAUSE_Z_OFFSET + modle_z    # 计算当前z高度
             LOGI(f'暂停次数:{self.change_count}, 抬高次数{cc}, 当前z高度{z_height}')
             if z_height > consts.DO_HOME_Z_HEIGHT:  # 如果当前高度超过回中预设高度则回中
                 need_z_home = True
@@ -289,13 +288,8 @@ class BambuClient(PrinterClient, TAGLOG):
                 need_z_home = True
 
         if need_z_home:
-            upz = f'G1 Z{self.cur_layer * self.gcodeInfo.layer_height + 2} F30000'
             LOGI('修复z高度')
-            if consts.FIX_Z_TEMP > 0:
-                self.publish_gcode_await(
-                    f'G1 E-28 F500\nM106 P1 S255\nM109 S{consts.FIX_Z_TEMP}\n{consts.FIX_Z_GCODE}\n{upz}\n', after_gcode=f'M106 P1 S0\nM109 S{pre_tem}\n')
-            else:
-                self.publish_gcode_await(f'G1 E-28 F500\nM106 P1 S255\nM400 S3\n{consts.FIX_Z_GCODE}\n{upz}\n', after_gcode=f'M106 P1 S0\nM109 S{pre_tem}\n')
+            self.publish_gcode_await(f'G1 E-28 F500\n{consts.FIX_Z_GCODE}\nG1 Z{modle_z + 2} F30000\n', after_gcode=f'M104 S{pre_tem}\n')
             self.latest_home_change_count = self.change_count
         else:
             self.pull_filament(pre_tem)
@@ -310,7 +304,7 @@ class BambuClient(PrinterClient, TAGLOG):
 
     def pull_filament(self, pre_tem=255):
         # 抽回一段距离，提前升温
-        self.publish_gcode_await('G1 E-28 F500\n', f'M109 S{pre_tem}\n')
+        self.publish_gcode_await('G1 E-28 F500\n', f'M104 S{pre_tem}\n')
 
     def resume(self):
         super().resume()

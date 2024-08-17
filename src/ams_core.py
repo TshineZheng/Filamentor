@@ -143,6 +143,8 @@ class AMSCore(TAGLOG):
         for c, i in self.channels:
             c.control(i, ChannelAction.STOP)
 
+        self.driver_control(self.fila_cur, ChannelAction.NONE)
+
         if self.task_log_id:
             self.LOGI(f"{self.task_name} {'打印完成' if action == printer.Action.TASK_FINISH else '打印失败'}")
             self.task_name = None

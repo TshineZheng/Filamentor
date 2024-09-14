@@ -1,4 +1,6 @@
+from datetime import datetime
 import json
+import os
 import ssl
 import time
 import paho.mqtt.client as mqtt
@@ -60,7 +62,7 @@ class BambuClient(PrinterClient, TAGLOG):
         self.TOPIC_SUBSCRIBE = f"device/{config.device_serial}/report"
         self.TOPIC_PUBLISH = f"device/{config.device_serial}/request"
 
-        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=BAMBU_CLIENT_ID)
+        client = mqtt.Client(client_id=BAMBU_CLIENT_ID)
         # 设置TLS
         # 如果服务器使用自签名证书，请使用ssl.CERT_NONE
         client.tls_set(cert_reqs=ssl.CERT_NONE)
@@ -78,6 +80,14 @@ class BambuClient(PrinterClient, TAGLOG):
 
         self.clean()
 
+        self.read_env()
+
+    def read_env(self):
+        self.change_count = int(os.getenv("CHANGE_COUNT", '0'))
+        self.latest_home_change_count = int(os.getenv("LATEST_HOME_CHANGE_COUNT", '0'))
+        LOGI(f'CHANGE_COUNT: {self.change_count}')
+        LOGI(f'LATEST_HOME_CHANGE_COUNT: {self.latest_home_change_count}')
+
     def isPrinting(self):
         return self.print_status == 'PAUSE' or self.print_status == 'RUNNING'
 
@@ -87,7 +97,8 @@ class BambuClient(PrinterClient, TAGLOG):
         self.mc_remaining_time = 0
         self.magic_command = 0
         self.cur_layer = 0
-        self.new_filament_temp = 0
+        self.new_fila_temp = 0
+        self.pre_fila_temp = 0
         self.next_extruder = -1
         self.change_count = 0
         self.latest_home_change_count = 0
@@ -112,6 +123,16 @@ class BambuClient(PrinterClient, TAGLOG):
             'device_serial': self.config.device_serial
         }
 
+    def publish_gcode_await(self, gcode, after_gcode=None):
+        save_percent = self.mc_percent
+        self.publish_gcode(f'{gcode}\nM400\nM73 P101\n{after_gcode if after_gcode else ""}\n')
+        ts = 0
+        while self.mc_percent != 101:
+            if ts < datetime.now().timestamp():
+                self.publish_status()
+                ts = datetime.now().timestamp() + 0.5
+        self.publish_gcode(f'M73 P{save_percent}\n')
+
     def publish_gcode(self, g_code):
         operation_code = '{"print": {"sequence_id": "1", "command": "gcode_line", "param": "' + g_code + '"},"user_id":"1"}'
         self.client.publish(self.TOPIC_PUBLISH, operation_code)
@@ -129,7 +150,7 @@ class BambuClient(PrinterClient, TAGLOG):
         self.client.publish(self.TOPIC_PUBLISH, bambu_pause)
 
     # noinspection PyUnusedLocal
-    def on_connect(self, client, userdata, flags, rc, properties):
+    def on_connect(self, client, userdata, flags, rc):
         if rc == 0:
             LOGI("连接竹子成功")
             # 连接成功后订阅主题
@@ -233,13 +254,18 @@ class BambuClient(PrinterClient, TAGLOG):
                     if ast(json_print, 'gcode_state', 'PAUSE'):  # 暂停状态
                         # self.trigger_pause = False
                         self.next_extruder = next_extruder
-                        self.new_filament_temp = new_filament_temp
+                        self.new_fila_temp = new_filament_temp
                         self.change_count += 1
 
+                        # FIXME: 这里实际上应该是当前耗材温度，而不是新耗材温度
+                        # 因为恢复暂停时会自动恢复之前的温度，所以这里的温度操作，实际上是为了维持温度，避免因为暂停导致温度暂停
+                        # 而且换料后，有一小断耗材还在打印头上，需要挤出，也需要维持之前的温度
                         self.on_action(Action.CHANGE_FILAMENT, {
                             'next_extruder': next_extruder,
-                            'next_filament_temp': self.new_filament_temp
+                            'next_filament_temp': self.pre_fila_temp if self.pre_fila_temp > 0 else new_filament_temp
                         })
+
+                        self.pre_fila_temp = new_filament_temp
                     else:
                         self.publish_status()
             else:
@@ -250,11 +276,10 @@ class BambuClient(PrinterClient, TAGLOG):
 
     def fix_z(self, pre_tem):
         cc = self.change_count - self.latest_home_change_count  # 计算距离上一次回中后换了几次色了
-
+        modle_z = self.cur_layer * self.gcodeInfo.layer_height  # 当前模型已经打印了多高
         need_z_home = False
-
         if consts.FIX_Z_PAUSE_COUNT == 0:  # 高度判断
-            z_height = cc * consts.PAUSE_Z_OFFSET + self.cur_layer * self.gcodeInfo.layer_height    # 计算当前z高度
+            z_height = cc * consts.PAUSE_Z_OFFSET + modle_z    # 计算当前z高度
             LOGI(f'暂停次数:{self.change_count}, 抬高次数{cc}, 当前z高度{z_height}')
             if z_height > consts.DO_HOME_Z_HEIGHT:  # 如果当前高度超过回中预设高度则回中
                 need_z_home = True
@@ -264,12 +289,8 @@ class BambuClient(PrinterClient, TAGLOG):
 
         if need_z_home:
             LOGI('修复z高度')
-            if consts.FIX_Z_TEMP > 0:
-                self.publish_gcode(f'G1 E-28 F500\nM106 P1 S255\nM109 S{consts.FIX_Z_TEMP}\n' + consts.FIX_Z_GCODE + f'M106 P1 S0\nM109 S{pre_tem}\n')
-            else:
-                self.publish_gcode(f'G1 E-28 F500\nM106 P1 S255\nM400 S3\n' + consts.FIX_Z_GCODE + f'M106 P1 S0\nM109 S{pre_tem}\n')
+            self.publish_gcode_await(f'G1 E-28 F500\n{consts.FIX_Z_GCODE}\nG1 Z{modle_z + 2} F30000\n', after_gcode=f'M104 S{pre_tem}\n')
             self.latest_home_change_count = self.change_count
-            time.sleep(2)
         else:
             self.pull_filament(pre_tem)
 
@@ -283,18 +304,11 @@ class BambuClient(PrinterClient, TAGLOG):
 
     def pull_filament(self, pre_tem=255):
         # 抽回一段距离，提前升温
-        self.publish_gcode(
-            f"""
-            G1 E-28 F500
-            M109 S{pre_tem}
-            """.replace('\n', '\\n')
-        )
-        time.sleep(2)
+        self.publish_gcode_await('G1 E-28 F500\n', f'M104 S{pre_tem}\n')
 
     def resume(self):
         super().resume()
-        self.publish_gcode('G1 E1 F500\n')    # 夹紧耗材
-        time.sleep(1)
+        self.publish_gcode_await('M83\nG1 E2 F500\n')    # 夹紧耗材
         self.publish_resume()
         self.publish_clear()
         self.publish_status()
@@ -315,77 +329,6 @@ class BambuClient(PrinterClient, TAGLOG):
     def filament_broken_detect(self) -> BrokenDetect:
         return self.fbd
 
-    def waiting_pause(self):
-        self.waiing_199_flag = False
-        while not self.wating_pause_flag:
-            self.publish_status()
-            time.sleep(1)
-
-    def waiting_magic_command(self, magic_code: int):
-        while not self.magic_command == magic_code:
-            self.publish_status()
-            time.sleep(1)
-        self.LOGD(f'magic command {magic_code} received')
-
-    def change_filament(self, ams, next_fila: int, change_temp: int = 255):
-        # time.sleep(10)
-        # self.LOGI('发送暂停指令')
-        self.publish_pause()    # 先让打印机暂停
-
-        self.waiting_pause()    # 等待打印机暂停
-
-        self.LOGI('已暂停')
-
-        self.LOGI('开始切料')
-
-        # 执行切料
-        cut_code = f"""
-            M106 P1 S0
-            M106 P2 S0
-            M109 S{change_temp}
-
-            ; cut filament
-            M17 S
-            M17 X1.1
-            G1 X180 F18000
-            G1 X201 F1000
-            G1 E-2 F500
-            G1 X180 F3000
-            G1 X-13.5 F18000
-            M17 R
-
-            M400
-
-            M73 M73 L{MAGIC_AWAIT}
-        """.replace('\n', '\\n')
-        self.publish_gcode(cut_code)
-        self.waiting_magic_command(MAGIC_AWAIT)
-
-        self.LOGI('切料完成')
-
-        ams.run_filament_change(next_fila, self.__change_fila_swip())
-
-    def __change_fila_swip(self):
-        self.LOGI('开始冲刷')
-        filament_e_feedrate = 224
-        new_filament_temp = 255
-        wipe_code = f"""
-            M109 S{new_filament_temp}
-            M106 P1 S60
-
-            G1 E35 F{filament_e_feedrate}
-
-            G1 E-2 F1800
-            G1 E2 F300
-
-            M400
-
-            M73 M73 L{MAGIC_AWAIT+1}
-        """.replace('\n', '\\n')
-        self.publish_gcode(wipe_code)
-        self.waiting_magic_command(MAGIC_AWAIT+1)
-        self.LOGI('冲刷完成')
-
 
 class BambuBrokenDetect(BrokenDetect):
     @staticmethod
@@ -397,7 +340,7 @@ class BambuBrokenDetect(BrokenDetect):
         self.fila_state = FilamentState.UNKNOWN
 
     def is_filament_broken(self) -> bool:
-        self.bambu_client.refresh_status()
+        self.bambu_client.refresh_status()  # FIXME: 这里不应该不断刷新
         return FilamentState.NO == self.fila_state
 
     def get_safe_time(self) -> float:

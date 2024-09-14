@@ -41,9 +41,9 @@ M73 L{layer_num+1} ; restore layer_num
 {if next_extruder < 255}
 M400
 
-G1 E18 F200 ;Filament is pushed back in 18 mm. 
-G1 E2 F20 ;Filament is pushed back in 2 mm but slower. 
-M400 ;Waits until pushing back in is completed before doing anything else
+; G1 E18 F200 ;Filament is pushed back in 18 mm. 
+; G1 E2 F20 ;Filament is pushed back in 2 mm but slower. 
+; M400 ;Waits until pushing back in is completed before doing anything else
 
 G92 E0
 

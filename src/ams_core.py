@@ -59,7 +59,7 @@ class AMSCore(TAGLOG):
 
         Args:
             printer_ch (int): 打印机通道
-            action (ChannelAction, optional): 通道动作, 如果动作为ChannelAction.NONE, 则自动根据控制器类型设置默认状态. Defaults to ChannelAction.NONE.
+            action (ChannelAction, optional): 通道动作, 如果动作为ChannelAction.NONE, 则自动根据控制器类型设置待机状态. Defaults to ChannelAction.NONE.
         """
         # FIXME: 这里最好加个任务结束判断，避免任务结束后，还在自动控制通道动作
         c, i = self.channels[printer_ch]
@@ -134,20 +134,16 @@ class AMSCore(TAGLOG):
 
         # TODO: 如果打印机没有料，就不要送料了，且提示用户进那个料
 
-        # 如果通道是主动送料，则启动时，开始送料
-        c, i = self.channels[self.fila_cur]
-
-        self.driver_control(self.fila_cur, ChannelAction.PUSH if c.is_initiative_push(i) else ChannelAction.STOP)
+        self.driver_control(self.fila_cur, ChannelAction.NONE)
 
         if first_filament != self.fila_cur:
             self.LOGI("打印的第一个通道不是AMS当前通道, 需要换色")
-            # threading.Thread(
-            #     target=self.printer_client.change_filament,
-            #     args=(self, first_filament, self.change_tem)).start()
 
     def __on_task_stopped(self, action: printer.Action):
         for c, i in self.channels:
             c.control(i, ChannelAction.STOP)
+
+        self.driver_control(self.fila_cur, ChannelAction.NONE)
 
         if self.task_log_id:
             self.LOGI(f"{self.task_name} {'打印完成' if action == printer.Action.TASK_FINISH else '打印失败'}")
@@ -161,12 +157,9 @@ class AMSCore(TAGLOG):
         self.task_log_id = LOG.add(
             sink=f'{consts.STORAGE_PATH}/logs/task/{datetime.now().strftime("%Y%m%d-%H%M%S")}_{self.task_name}.log',
             enqueue=True,
-            rotation='1 days',
-            retention='1 weeks',
             encoding='utf-8',
             backtrace=True,
             diagnose=True,
-            compression='zip'
         )
 
     def stop_task_log(self):
@@ -231,7 +224,7 @@ class AMSCore(TAGLOG):
         # 等待打印机小绿点消失，如果超过一定时间，估计是卡五通了
         ts = datetime.now().timestamp()
         max_unload_time = ts + PRINTER_UNLOAD_WARNING
-        while self.printer_fila_state == printer.FilamentState.NO:
+        while self.printer_fila_state != printer.FilamentState.NO:
             if not self.hasTask():
                 return
             if max_unload_time < datetime.now().timestamp():
@@ -287,6 +280,8 @@ class AMSCore(TAGLOG):
 
             if max_push_time < datetime.now().timestamp():
                 self.LOGI("送不进去，摇人吧（需要手动把料送进去）")
+                self.driver_control(self.fila_next, ChannelAction.STOP)  # 送不进去就停止送料
+                time.sleep(2)
                 # TODO: 发出警报
             elif datetime.now().timestamp() - ts > LOAD_TIMEOUT:
                 self.LOGI("送料超时，抖一抖")

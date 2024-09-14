@@ -1,5 +1,10 @@
 ; 这是 A1Mini 通过回中来修复暂停后 z 轴抬高问题的 gcode, 请参看 .env 文件中的相关介绍
 
+M106 P1 S255
+M109 S200 ; cool down
+; M400 S3 ; or just wait
+
+G90
 G1 X-13.5 F18000 ; back to the toilet
 
 ; WIPE
@@ -9,8 +14,51 @@ G1 X-3.5 F18000
 G1 X-13.5 F3000
 G1 X-3.5 F18000
 G1 X-13.5 F3000
-M400
 
+G90
+G1 Z5 F30000
+G1 X25 Y175 F30000.1 ;Brush material
+G1 Z0.2 F30000.1
+G1 Y185
+G91
+G1 X-30 F30000
+G1 Y-2
+G1 X27
+G1 Y1.5
+G1 X-28
+G1 Y-2
+G1 X30
+G1 Y1.5
+G1 X-30
+
+G90
+G1 Z5 F30000 ;;;;;;;
+G0 X85 Y185 F10000 ;move to exposed steel surface and stop the nozzle
+G0 Z-1.01 F10000
+G91
+G2 I1 J0 X2 Y0 F2000.1
+G2 I-0.75 J0 X-1.5
+G2 I1 J0 X2
+G2 I-0.75 J0 X-1.5
+G2 I1 J0 X2
+G2 I-0.75 J0 X-1.5
+G2 I1 J0 X2
+G2 I-0.75 J0 X-1.5
+G2 I1 J0 X2
+G2 I-0.75 J0 X-1.5
+G2 I1 J0 X2
+G2 I-0.75 J0 X-1.5
+G2 I1 J0 X2
+G2 I-0.75 J0 X-1.5
+G2 I1 J0 X2
+G2 I-0.75 J0 X-1.5
+G2 I1 J0 X2
+G2 I-0.75 J0 X-1.5
+G2 I1 J0 X2
+G2 I-0.75 J0 X-1.5
+
+G90
+G1 Z5 F30000
 G1 X25 Y175 F30000.1 ;Brush material
 G1 Z0.2 F30000.1
 G1 Y185
@@ -34,3 +82,4 @@ G29.2 S0 ; turn off ABL
 
 G1 X-13.5 F18000 ; back to the toilet
 
+M106 P1 S0

@@ -224,7 +224,7 @@ class AMSCore(TAGLOG):
         # 等待打印机小绿点消失，如果超过一定时间，估计是卡五通了
         ts = datetime.now().timestamp()
         max_unload_time = ts + PRINTER_UNLOAD_WARNING
-        while self.printer_fila_state == printer.FilamentState.NO:
+        while self.printer_fila_state != printer.FilamentState.NO:
             if not self.hasTask():
                 return
             if max_unload_time < datetime.now().timestamp():

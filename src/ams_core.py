@@ -140,10 +140,10 @@ class AMSCore(TAGLOG):
             self.LOGI("打印的第一个通道不是AMS当前通道, 需要换色")
 
     def __on_task_stopped(self, action: printer.Action):
-        for c, i in self.channels:
-            c.control(i, ChannelAction.STOP)
-
-        self.driver_control(self.fila_cur, ChannelAction.NONE)
+        # TODO: 最好能强制通知所有通道，后续优化
+        self.driver_control(self.fila_next, ChannelAction.STOP)  # 有可能是换料过程中停止打印，所以要考虑未换料完成的情况
+        time.sleep(1)
+        self.driver_control(self.fila_cur, ChannelAction.STOP)
 
         if self.task_log_id:
             self.LOGI(f"{self.task_name} {'打印完成' if action == printer.Action.TASK_FINISH else '打印失败'}")

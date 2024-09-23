@@ -308,7 +308,7 @@ class BambuClient(PrinterClient, TAGLOG):
 
     def resume(self):
         super().resume()
-        self.publish_gcode_await('M83\nG1 E2 F500\n')    # 夹紧耗材
+        self.publish_gcode_await('M83\nG1 E3 F500\n')    # 夹紧耗材
         self.publish_resume()
         self.publish_clear()
         self.publish_status()

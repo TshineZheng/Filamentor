@@ -340,7 +340,6 @@ class BambuBrokenDetect(BrokenDetect):
         self.fila_state = FilamentState.UNKNOWN
 
     def is_filament_broken(self) -> bool:
-        self.bambu_client.refresh_status()  # FIXME: 这里不应该不断刷新
         return FilamentState.NO == self.fila_state
 
     def get_safe_time(self) -> float:

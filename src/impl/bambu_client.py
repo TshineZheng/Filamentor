@@ -1,8 +1,11 @@
 from datetime import datetime
 import json
+import math
 import os
 import ssl
+import threading
 import time
+from typing import Any
 import paho.mqtt.client as mqtt
 
 from src import consts
@@ -25,6 +28,8 @@ bambu_load = '{"print":{"command":"ams_change_filament","curr_temp":220,"sequenc
 bambu_done = '{"print":{"command":"ams_control","param":"done","sequence_id":"1"},"user_id":"1"}'
 bambu_clear = '{"print":{"command": "clean_print_error","sequence_id":"1"},"user_id":"1"}'
 bambu_status = '{"pushing": {"sequence_id": "0", "command": "pushall"}}'
+bambu_start_push = '{"pushing": {"sequence_id": "0", "command": "start"}}'
+
 
 MAGIC_CHANNEL = 1000
 MAGIC_COMMAND = 2000
@@ -40,6 +45,7 @@ class BambuClientConfig(object):
 
 
 class BambuClient(PrinterClient, TAGLOG):
+    _watchdog = None
 
     @staticmethod
     def type_name() -> str:
@@ -63,18 +69,18 @@ class BambuClient(PrinterClient, TAGLOG):
         self.TOPIC_PUBLISH = f"device/{config.device_serial}/request"
 
         client = mqtt.Client(client_id=BAMBU_CLIENT_ID)
-        # 设置TLS
-        # 如果服务器使用自签名证书，请使用ssl.CERT_NONE
-        client.tls_set(cert_reqs=ssl.CERT_NONE)
-        client.tls_insecure_set(True)  # 只有在使用自签名证书时才设置为True
-
-        # 设置用户名和密码
-        client.username_pw_set(USERNAME, config.lan_password)
 
         # 设置回调函数
         client.on_connect = self.on_connect
         client.on_disconnect = self.on_disconnect
         client.on_message = self.on_message
+        client.reconnect_delay_set(min_delay=1, max_delay=1)
+
+        client.tls_set(tls_version=ssl.PROTOCOL_TLS, cert_reqs=ssl.CERT_NONE)
+        client.tls_insecure_set(True)
+
+        # 设置用户名和密码
+        client.username_pw_set(USERNAME, config.lan_password)
 
         self.client = client
 
@@ -150,31 +156,35 @@ class BambuClient(PrinterClient, TAGLOG):
         self.client.publish(self.TOPIC_PUBLISH, bambu_pause)
 
     # noinspection PyUnusedLocal
-    def on_connect(self, client, userdata, flags, rc):
-        if rc == 0:
+    def on_connect(self,
+                   client_: mqtt.Client,
+                   userdata: None,
+                   flags: dict[str, Any],
+                   result_code: int,
+                   properties: mqtt.Properties | None = None, ):
+        if result_code == 0:
             LOGI("连接竹子成功")
             # 连接成功后订阅主题
-            client.subscribe(self.TOPIC_SUBSCRIBE, qos=1)
+            client_.subscribe(self.TOPIC_SUBSCRIBE, qos=1)
+            LOGI('健康监控线程 - 启动')
+            self._watchdog = WatchdogThread(self)
+            self._watchdog.start()
         else:
-            LOGE(f"连接竹子失败，错误代码 {rc}")
+            LOGE(f"连接竹子失败，错误代码 {result_code}")
 
     # noinspection PyUnusedLocal
-    def on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
+    def on_disconnect(self,
+                      client_: mqtt.Client,
+                      userdata: None,
+                      result_code: int):
         if not self.is_running:
             return
 
         LOGE("连接已断开，请检查打印机状态，以及是否有其它应用占用了打印机")
-        self.reconnect(client)
-
-    def reconnect(self, client, delay=3):
-        while True:
-            LOGE("尝试重新连接竹子...")
-            try:
-                client.reconnect()
-                break  # 重连成功则退出循环
-            except:
-                LOGE(f"重连竹子失败 {delay} 秒后重试...")
-                time.sleep(delay)  # 等待一段时间后再次尝试
+        if self._watchdog is not None:
+            LOGW("健康监控线程 - 关闭")
+            self._watchdog.stop()
+            self._watchdog.join()
 
     def on_message(self, client, userdata, message: mqtt.MQTTMessage):
         try:
@@ -191,6 +201,20 @@ class BambuClient(PrinterClient, TAGLOG):
         except Exception as e:
             LOGE(f"JSON解析失败: {e}")
             return
+
+        # These are events from the bambu cloud mqtt feed and allow us to detect when a local
+        # device has connected/disconnected (e.g. turned on/off)
+        if json_data.get("event"):
+            if json_data.get("event").get("event") == "client.connected":
+                LOGD("Client connected event received.")
+                self.on_disconnect()  # We aren't guaranteed to recieve a client.disconnected event.
+                self.on_connect()
+            elif json_data.get("event").get("event") == "client.disconnected":
+                LOGD("Client disconnected event received.")
+                self.on_disconnect()
+            return
+
+        self._watchdog.received_data()
 
         if 'print' not in json_data:
             return
@@ -329,6 +353,9 @@ class BambuClient(PrinterClient, TAGLOG):
     def filament_broken_detect(self) -> BrokenDetect:
         return self.fbd
 
+    def _on_watchdog_fired(self):
+        self.client.publish(self.TOPIC_PUBLISH, bambu_start_push)
+
 
 class BambuBrokenDetect(BrokenDetect):
     @staticmethod
@@ -357,3 +384,40 @@ class BambuBrokenDetect(BrokenDetect):
 
     def to_dict(self) -> dict:
         return super().to_dict()
+
+
+class WatchdogThread(threading.Thread):
+
+    def __init__(self, client: BambuClient):
+        self._client = client
+        self._watchdog_fired = False
+        self._stop_event = threading.Event()
+        self._last_received_data = time.time()
+        super().__init__()
+        self.setName(f"{self._client.config.printer_ip}-Watchdog-{threading.get_native_id()}")
+
+    def stop(self):
+        self._stop_event.set()
+
+    def received_data(self):
+        self._last_received_data = time.time()
+
+    def run(self):
+        LOGI("Watchdog thread started.")
+        WATCHDOG_TIMER = 30
+        while True:
+            # Wait out the remainder of the watchdog delay or 1s, whichever is higher.
+            interval = time.time() - self._last_received_data
+            wait_time = max(1, WATCHDOG_TIMER - interval)
+            if self._stop_event.wait(wait_time):
+                # Stop event has been set. Exit thread.
+                break
+            interval = time.time() - self._last_received_data
+            if not self._watchdog_fired and (interval > WATCHDOG_TIMER):
+                LOGD(f"Watchdog fired. No data received for {math.floor(interval)} seconds for {self._client.config.printer_ip}.")
+                self._watchdog_fired = True
+                self._client._on_watchdog_fired()
+            elif interval < WATCHDOG_TIMER:
+                self._watchdog_fired = False
+
+        LOGI("Watchdog thread exited.")

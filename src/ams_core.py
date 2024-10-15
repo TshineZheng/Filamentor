@@ -45,7 +45,7 @@ class AMSCore(TAGLOG):
         for c in config.get_printer_channel_settings(use_printer):
             self.channels.append([config.get_controller(c.controller_id), c.channel])
 
-        self.LOGI(f'通道数量: {len(self.channels)}, 断料检测器数量: {len(self.broken_detects)}, 换色温度: {self.change_tem}, 当前通道: {self.fila_cur+1}')
+        self.LOGI(f'通道数量: {len(self.channels)}, 断料检测器数量: {len(self.broken_detects)}, 当前通道: {self.fila_cur+1}')
         for c, i in self.channels:
             self.LOGD(f'通道: {c.type_name()} {i}')
         for bd in self.broken_detects:
